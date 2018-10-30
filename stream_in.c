@@ -1,0 +1,430 @@
+/*
+ * Copyright (C) 2013-2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/*
+ * Copyright (C) 2018 EPAM Systems Inc.
+ */
+
+/*
+ * This module implements functions for 'struct audio_stream_in',
+ * so please see hardware/audio.h for description of function's
+ * behavior and expected results.
+ */
+
+#define LOG_TAG "xa_in"
+#define LOG_FUNC_TRACES 1
+
+/* standard headers */
+#include <stdlib.h>
+#include <inttypes.h>
+/* android headers */
+#include <log/log.h>
+/* local headers*/
+#include "audio_hw_config.h"
+#include "dbg_func_traces.h"
+#include "stream_in.h"
+
+
+uint32_t in_get_sample_rate(const struct audio_stream *stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    return ((x_stream_in_t*)stream)->p_config.rate;
+}
+
+int in_set_sample_rate(struct audio_stream *stream, uint32_t rate)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, %d)", stream, rate);
+    /* obsolete, not used function */
+    return -ENOSYS;
+}
+
+size_t in_get_buffer_size(const struct audio_stream *stream)
+{
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+    size_t bytes = 0;
+
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    pthread_mutex_lock(&xin->lock);
+    bytes = xin->p_config.period_size * xin->frame_size;
+    ALOGD("Calculated buffer_size:%zu", bytes);
+    pthread_mutex_unlock(&xin->lock);
+    return bytes;
+}
+
+audio_channel_mask_t in_get_channels(const struct audio_stream *stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    return ((x_stream_in_t*)stream)->a_channel_mask;
+}
+
+audio_format_t in_get_format(const struct audio_stream *stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    return ((x_stream_in_t*)stream)->a_format;
+}
+
+int in_set_format(struct audio_stream *stream, audio_format_t format)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, %08x)", stream, format);
+    /* obsolete, not used function */
+    return -ENOSYS;
+}
+
+int in_standby(struct audio_stream *stream)
+{
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+
+    pthread_mutex_lock(&xin->lock);
+    if (xin->standby) {
+        ALOGV("In standby already.");
+    } else {
+        xin->standby = true;
+        /* close pcm device */
+        if (xin->p_handle != NULL) {
+            pcm_close(xin->p_handle);
+            xin->p_handle = NULL;
+        }
+    }
+    pthread_mutex_unlock(&xin->lock);
+    return 0;
+}
+
+int in_dump(const struct audio_stream *stream, int fd)
+{
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+
+    LOG_FN_NAME_WITH_ARGS("(%p, fd:%d)", stream, fd);
+
+    pthread_mutex_lock(&xin->lock);
+
+    dprintf(fd, "    audio_stream_in_t: %p\n", &xin->astream);
+    dprintf(fd, "    lock: %p\n", &xin->lock);
+    dprintf(fd, "    config.channels: %d\n", xin->p_config.channels);
+    dprintf(fd, "      .rate: %d\n", xin->p_config.rate);
+    dprintf(fd, "      .period_size: %d\n", xin->p_config.period_size);
+    dprintf(fd, "      .period_count: %d\n", xin->p_config.period_count);
+    dprintf(fd, "      .format: %d\n", xin->p_config.format);
+    dprintf(fd, "      .start_threshold: %d\n", xin->p_config.start_threshold);
+    dprintf(fd, "      .stop_threshold: %d\n", xin->p_config.stop_threshold);
+    dprintf(fd, "      .silence_threshold: %d\n", xin->p_config.silence_threshold);
+    dprintf(fd, "      .silence_size: %d\n", xin->p_config.silence_size);
+    dprintf(fd, "      .avail_min: %d\n", xin->p_config.avail_min);
+    dprintf(fd, "    pcm handle: %p\n", xin->p_handle);
+    dprintf(fd, "    audio_devices_t: %u\n", xin->a_dev);
+    dprintf(fd, "    audio_channel_mask_t: %d\n", xin->a_channel_mask);
+    dprintf(fd, "    audio_format_t: %d\n", xin->a_format);
+    dprintf(fd, "    standby: %s\n", xin->standby ? "true" : "false");
+    dprintf(fd, "    frame_size: %zu\n", xin->frame_size);
+    dprintf(fd, "    muted: %s\n", xin->muted ? "true" : "false");
+    dprintf(fd, "    read_frames: %" PRIu64 "\n", xin->read_frames);
+    dprintf(fd, "    last_time: %" PRIu64 "\n", xin->last_time);
+
+    pthread_mutex_unlock(&xin->lock);
+    return 0;
+}
+
+audio_devices_t in_get_device(const struct audio_stream *stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    return ((x_stream_in_t*)stream)->a_dev;
+}
+
+int in_set_device(struct audio_stream *stream, audio_devices_t device)
+{
+    /* Function is outdated and not used.
+       Re-routnig have to be handled in set_parameters() */
+    LOG_FN_NAME_WITH_ARGS("(%p, %08x)", stream, device);
+    return 0;
+}
+
+int in_set_parameters(struct audio_stream *stream, const char *kv_pairs)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, kv_pairs);
+    /* TODO To implement */
+    return 0;
+}
+
+char * in_get_parameters(const struct audio_stream *stream, const char *keys)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, keys);
+    /* TODO To implement */
+    return strdup("");
+}
+
+int in_add_audio_effect(const struct audio_stream *stream, effect_handle_t effect)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, %p)", stream, effect);
+    /* TODO To implement */
+    return -ENOSYS;
+}
+
+int in_remove_audio_effect(const struct audio_stream *stream, effect_handle_t effect)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, %p)", stream, effect);
+    /* TODO To implement */
+    return -ENOSYS;
+}
+
+int in_set_gain(struct audio_stream_in *stream, float gain)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p, %f)", stream, gain);
+    /* not supported for now */
+    return -ENOSYS;
+}
+
+ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
+{
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+    int pcm_res = 0;
+    ssize_t ret_code = bytes;
+    struct timespec time;
+
+    LOG_FN_NAME_WITH_ARGS("(%p, buffer:%p, bytes:%zu)", stream, buffer, bytes);
+
+    if ((stream == NULL) || (buffer == NULL)) {
+        return -EINVAL;
+    }
+    if (bytes == 0) {
+        return 0;  /* job done - zero bytes are read */
+    }
+
+    pthread_mutex_lock(&xin->lock);
+
+    if (xin->standby) {
+        xin->standby = false;
+        /* turn device on */
+        xin->p_handle = pcm_open(xin->p_card_id, xin->p_dev_id, PCM_IN, &(xin->p_config));
+        if ((xin->p_handle == NULL) || (!pcm_is_ready(xin->p_handle))) {
+            ALOGE("%s failed. Can't reopen stream on device.", __FUNCTION__);
+            if (xin->p_handle != NULL) {
+                pcm_close(xin->p_handle);
+            }
+            pthread_mutex_unlock(&xin->lock);
+            return -ENOMEM;
+        }
+    }
+    pcm_res = pcm_read(xin->p_handle, buffer, bytes);
+
+    if (pcm_res < 0) {
+        ALOGD("Read failed with %d '%s'", pcm_res, pcm_get_error(xin->p_handle));
+        ret_code = pcm_res;
+    } else {
+        if (xin->muted) {
+            /* return clear buffer if mic is muted,
+               but we have to wait for time required for record */
+            memset(buffer, 0, bytes);
+            ret_code = bytes;
+        }
+    }
+
+    xin->read_frames += bytes / xin->frame_size;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+    xin->last_time = time.tv_sec * 1000000000LL + time.tv_nsec;
+
+    pthread_mutex_unlock(&xin->lock);
+
+    return ret_code;
+}
+
+uint32_t in_get_input_frames_lost(struct audio_stream_in *stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    /* is not supported for now */
+    return 0;
+}
+
+int in_get_capture_position(const struct audio_stream_in *stream,
+                            int64_t *frames, int64_t *time)
+{
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+
+    if (stream == NULL) {
+        return -EINVAL;
+    }
+
+    if (frames != NULL) {
+        *frames = xin->read_frames;
+    }
+    if (time != NULL) {
+        *time = xin->last_time;
+    }
+    /* this trace generates lots of messages */
+    /* ALOGD("igcp: %" PRIu64 ", %" PRIu64, xin->read_frames, xin->last_time); */
+
+    return 0;
+}
+
+int in_start(const struct audio_stream_in* stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    /* MMAP is not supported for now */
+    return -ENOSYS;
+}
+
+int in_stop(const struct audio_stream_in* stream)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    /* MMAP is not supported for now */
+    return -ENOSYS;
+}
+
+int in_create_mmap_buffer(const struct audio_stream_in *stream,
+                          int32_t min_size_frames,
+                          struct audio_mmap_buffer_info *info)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    /* MMAP is not supported for now */
+    return -ENODEV;
+}
+
+int in_get_mmap_position(const struct audio_stream_in *stream,
+                         struct audio_mmap_position *position)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    /* MMAP is not supported for now */
+    return -ENODATA;
+}
+
+int in_get_active_microphones(const struct audio_stream_in *stream,
+                              struct audio_microphone_characteristic_t *mic_array,
+                              size_t *mic_count)
+{
+    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
+    /* TODO To implement */
+    return -ENOSYS;
+}
+
+void in_update_sink_metadata(struct audio_stream_in *stream,
+                             const struct sink_metadata* sink_metadata)
+{
+    if (sink_metadata == NULL) {
+        return;
+    }
+    LOG_FN_NAME_WITH_ARGS("(%p, tracks:%zu)", stream, sink_metadata->track_count);
+    for (unsigned int i = 0; i < sink_metadata->track_count; i++) {
+        LOG_FN_PARAMETERS("track[%d].source:%d, .gain:%f",
+                i, sink_metadata->tracks[i].source, sink_metadata->tracks[i].gain);
+    }
+    /* For now we can't set gain, so we have nothing to do here */
+}
+
+int in_create(struct audio_hw_device *dev,
+        audio_io_handle_t handle,
+        audio_devices_t devices,
+        unsigned int hw_card_id,
+        unsigned int hw_device_id,
+        struct audio_config *config,
+        struct audio_stream_in **stream_in)
+{
+    /* supposed to be called by device, so config is always supported
+       allocate stream
+       set stream parameters
+       set function pointers
+       connect to specified hardware */
+
+    x_stream_in_t *xin = NULL;
+
+    xin = (x_stream_in_t*)calloc(1, sizeof(x_stream_in_t));
+    if (xin == NULL) {
+        ALOGE("%s failed. -ENOMEM", __FUNCTION__);
+        *stream_in = NULL;
+        return -ENOMEM;
+    }
+
+    /* setup stream structure */
+    pthread_mutex_init(&xin->lock, NULL);
+    xin->a_dev = devices;
+    xin->a_channel_mask = config->channel_mask;
+    xin->a_format = config->format;
+    xin->p_card_id = hw_card_id;
+    xin->p_dev_id = hw_device_id;
+    /* following fields are cleared by calloc:
+        xin->standby
+        xin->muted
+    */
+
+    xin->p_config.channels = popcount(config->channel_mask);
+    xin->p_config.rate = config->sample_rate;
+    xin->p_config.period_size = xa_config_default.period_size;
+    xin->p_config.period_count = xa_config_default.period_count;
+    xin->p_config.format = xa_config_default.format;
+
+    xin->astream.common.get_sample_rate = in_get_sample_rate;
+    xin->astream.common.set_sample_rate = in_set_sample_rate;
+    xin->astream.common.get_buffer_size = in_get_buffer_size;
+    xin->astream.common.get_channels = in_get_channels;
+    xin->astream.common.get_format = in_get_format;
+    xin->astream.common.set_format = in_set_format;
+    xin->astream.common.standby = in_standby;
+    xin->astream.common.dump = in_dump;
+    xin->astream.common.get_device = in_get_device;
+    xin->astream.common.set_device = in_set_device;
+    xin->astream.common.set_parameters = in_set_parameters;
+    xin->astream.common.get_parameters = in_get_parameters;
+    xin->astream.common.add_audio_effect = in_add_audio_effect;
+    xin->astream.common.remove_audio_effect = in_remove_audio_effect;
+
+    xin->astream.set_gain = in_set_gain;
+    xin->astream.read = in_read;
+    xin->astream.get_input_frames_lost = in_get_input_frames_lost;
+    xin->astream.get_capture_position = in_get_capture_position;
+    xin->astream.start = in_start;
+    xin->astream.stop = in_stop;
+    xin->astream.create_mmap_buffer = in_create_mmap_buffer;
+    xin->astream.get_mmap_position = in_get_mmap_position;
+    xin->astream.get_active_microphones = in_get_active_microphones;
+    xin->astream.update_sink_metadata = in_update_sink_metadata;
+
+    /* this can be called only when 'common' fields are initialized
+       frame_size changes rarely, so we can store it precalculated */
+    xin->frame_size = audio_stream_in_frame_size(&xin->astream);
+    ALOGD("Calculated xin->frame_size:%zu", xin->frame_size);
+
+    xin->p_handle = pcm_open(hw_card_id, hw_device_id, PCM_IN, &(xin->p_config));
+    if ((xin->p_handle == NULL) || (!pcm_is_ready(xin->p_handle))) {
+        ALOGE("%s failed. Can't open stream on device.", __FUNCTION__);
+        if (xin->p_handle != NULL) {
+            pcm_close(xin->p_handle);
+            xin->p_handle = NULL;
+        }
+        *stream_in = NULL;
+        free(xin);
+        return -ENOMEM;
+    }
+
+    *stream_in = &(xin->astream);
+
+    return 0;
+}
+
+void in_destroy(x_stream_in_t *xin)
+{
+    pthread_mutex_destroy(&xin->lock);
+    if (xin->p_handle != NULL) {
+        pcm_close(xin->p_handle);
+    }
+    free(xin);
+}
+
+void in_set_mute(x_stream_in_t *xin, bool mute)
+{
+    pthread_mutex_lock(&xin->lock);
+    xin->muted = mute;
+    pthread_mutex_unlock(&xin->lock);
+}
