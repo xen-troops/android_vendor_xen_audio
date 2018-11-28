@@ -24,7 +24,6 @@
  */
 
 #define LOG_TAG "xa_out"
-#define LOG_FUNC_TRACES 1
 
 /* standard headers */
 #include <stdlib.h>
