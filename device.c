@@ -534,10 +534,58 @@ int adev_get_audio_port(struct audio_hw_device *dev, struct audio_port *port)
 
 int adev_set_audio_port_config(struct audio_hw_device *dev, const struct audio_port_config *config)
 {
-    LOG_FN_NAME_WITH_ARGS("(%p, id:%d, role:%d, type:%d, config_mask:0x%x, "
-            "rate:%d, channel_mask:0x%x, format:%d)",
-            dev, config->id, config->role, config->type, config->config_mask,
-            config->sample_rate, config->channel_mask, config->format);
-    /* TODO To implement */
-    return -ENOSYS;
+    x_audio_device_t *xdev = (x_audio_device_t*)dev;
+
+    if ((dev == NULL) || (config == NULL)) {
+        return -EINVAL;
+    }
+
+    LOG_FN_NAME_WITH_ARGS("(%p, id:%d, role:%d, type:%d, config_mask:0x%x)",
+            dev, config->id, config->role, config->type, config->config_mask);
+
+    /* check that we are called for correct port type */
+    switch (config->type) {
+    case AUDIO_PORT_TYPE_DEVICE:
+        /* set config for audio_port_config_device_ext */
+        break;
+    case AUDIO_PORT_TYPE_MIX:
+        /* can't set config for audio_port_config_mix_ext */
+        LOG_FN_PARAMETERS("Not supported port type.");
+        return -ENOSYS;
+    case AUDIO_PORT_TYPE_SESSION:
+        /* can't set config for audio_port_config_session_ext */
+        LOG_FN_PARAMETERS("Not supported port type.");
+        return -ENOSYS;
+    default:
+        /* can't set config for not clear port type */
+        LOG_FN_PARAMETERS("Not supported port type.");
+        return -ENOSYS;
+    }
+
+    pthread_mutex_lock(&xdev->lock);
+    /* what should be configured? */
+    if ((config->config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) != 0) {
+        LOG_FN_PARAMETERS("rate:%d", config->sample_rate);
+        /* has supported value? */
+        /* set new value */
+    }
+    if ((config->config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) != 0) {
+        LOG_FN_PARAMETERS("channel_mask:0x%x", config->channel_mask);
+        /* has supported value? */
+        /* set new value */
+    }
+    if ((config->config_mask & AUDIO_PORT_CONFIG_FORMAT) != 0) {
+        LOG_FN_PARAMETERS("format:%d", config->format);
+        /* has supported value? */
+        /* set new value */
+    }
+    if ((config->config_mask & AUDIO_PORT_CONFIG_GAIN) != 0) {
+        LOG_FN_PARAMETERS("gain.index:%d, .mode:%d, .channel_mask:0x%x, values[], .ramp:%d",
+        config->gain.index, config->gain.mode, config->gain.channel_mask,
+        config->gain.ramp_duration_ms);
+        /* not possible to set gain in current configuration */
+    }
+    pthread_mutex_unlock(&xdev->lock);
+
+    return 0;
 }
