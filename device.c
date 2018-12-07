@@ -514,15 +514,18 @@ int adev_create_audio_patch(struct audio_hw_device *dev,
                 sinks[i].sample_rate, sinks[i].channel_mask, sinks[i].format);
     }
 
-    /* can't be implemented for current configuration */
-    return -ENOSYS;
+    /* for now we can only simulate that we created patch,
+       so let's return id of first sink */
+    *handle = sinks[0].id;
+    return 0;
 }
 
 int adev_release_audio_patch(struct audio_hw_device *dev, audio_patch_handle_t handle)
 {
     LOG_FN_NAME_WITH_ARGS("(%p, patch:%d)", dev, handle);
-    /* can't be implemented for current configuration */
-    return -ENOSYS;
+    /* can't be implemented for current configuration,
+     * so we will simulate success */
+    return 0;
 }
 
 int adev_get_audio_port(struct audio_hw_device *dev, struct audio_port *port)
