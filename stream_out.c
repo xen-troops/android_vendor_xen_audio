@@ -223,18 +223,18 @@ ssize_t out_write(struct audio_stream_out *stream, const void* buffer, size_t by
     pthread_mutex_lock(&xout->lock);
 
     if (xout->standby) {
-        xout->standby = false;
         /* turn device on */
         xout->p_handle = pcm_open(xout->p_card_id, xout->p_dev_id, PCM_OUT, &(xout->p_config));
         if ((xout->p_handle == NULL) || (!pcm_is_ready(xout->p_handle))) {
-            ALOGE("%s() failed. Can't reopen stream on device.", __FUNCTION__);
+            ALOGE("%s() failed (%d). Can't reopen stream on device.", __FUNCTION__, errno);
             if (xout->p_handle != NULL) {
                 pcm_close(xout->p_handle);
                 xout->p_handle = NULL;
             }
             pthread_mutex_unlock(&xout->lock);
-            return -ENOMEM;
+            return -errno;
         }
+        xout->standby = false;
     }
 
     frames = bytes / xout->frame_size;
