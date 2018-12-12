@@ -204,17 +204,17 @@ ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
     pthread_mutex_lock(&xin->lock);
 
     if (xin->standby) {
-        xin->standby = false;
         /* turn device on */
         xin->p_handle = pcm_open(xin->p_card_id, xin->p_dev_id, PCM_IN, &(xin->p_config));
         if ((xin->p_handle == NULL) || (!pcm_is_ready(xin->p_handle))) {
-            ALOGE("%s failed. Can't reopen stream on device.", __FUNCTION__);
+            ALOGE("%s() failed (%d). Can't reopen stream on device.", __FUNCTION__, errno);
             if (xin->p_handle != NULL) {
                 pcm_close(xin->p_handle);
             }
             pthread_mutex_unlock(&xin->lock);
-            return -ENOMEM;
+            return -errno;
         }
+        xin->standby = false;
     }
     pcm_res = pcm_read(xin->p_handle, buffer, bytes);
 
