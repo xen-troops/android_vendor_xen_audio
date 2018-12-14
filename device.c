@@ -39,6 +39,9 @@
 #include "stream_out.h"
 #include "stream_in.h"
 
+/* Number of supported output devices. Should be in sync with
+ * number of output buses in audio_policy_configuration.xml */
+#define NUMBER_OF_DEVICES_OUT 8
 
 typedef struct x_audio_device {
     /* NOTE audio_hw_device_t MUST be very first member of structure */
@@ -50,7 +53,7 @@ typedef struct x_audio_device {
     bool mic_is_muted;
     bool master_is_muted;
     x_stream_in_t * xin_stream;
-    x_stream_out_t * xout_stream;
+    x_stream_out_t * xout_streams[NUMBER_OF_DEVICES_OUT];
 } x_audio_device_t;
 
 
@@ -128,7 +131,7 @@ int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
             xadev->mic_is_muted
             xadev->master_is_muted
             xadev->xin_stream
-            xadev->xout_stream
+            xadev->xout_streams
         */
     }
     ref_counter++;
@@ -138,6 +141,8 @@ int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 
 int adev_close(hw_device_t *device)
 {
+    int i = 0;
+
     LOG_FN_NAME_WITH_ARGS("(%p)", device);
 
     if ((device == NULL) || (device != (hw_device_t*)xadev)) {
@@ -158,8 +163,11 @@ int adev_close(hw_device_t *device)
         if (xadev->xin_stream != NULL) {
             in_destroy(xadev->xin_stream);
         }
-        if (xadev->xout_stream != NULL) {
-            out_destroy(xadev->xout_stream);
+        for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
+            if (xadev->xout_streams[i] != NULL) {
+                out_destroy(xadev->xout_streams[i]);
+                xadev->xout_streams[i] = NULL;
+            }
         }
         pthread_mutex_destroy(&xadev->lock);
         free(xadev);
@@ -293,16 +301,15 @@ int adev_open_output_stream(struct audio_hw_device *dev,
                           const char *address)
 {
     int res = 0;
-    unsigned int card_id = CARD_ID;
-    unsigned int dev_id = DEVICE_ID_PLAYBACK;
+    unsigned int dev_id = NUMBER_OF_DEVICES_OUT;  /* out of range value */
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
 
     LOG_FN_NAME_WITH_ARGS(
-            "(%p, handle:0x%x, devices:0x%x, flags:0x%x, "
-            "rate:%d, channel_mask:0x%x, format:0x%x, offload.size:%d, frame_count:%d)",
+            "(%p, handle:%d, devices:0x%x, flags:0x%x, "
+            "rate:%d, channel_mask:0x%x, format:0x%x, address:'%s')",
             dev, handle, devices, flags,
             config->sample_rate, config->channel_mask, config->format,
-            config->offload_info.size, config->frame_count);
+            address);
 
     pthread_mutex_lock(&xdev->lock);
 
@@ -316,25 +323,50 @@ int adev_open_output_stream(struct audio_hw_device *dev,
         return -EINVAL;
     }
     /* check requested device */
-    /* TODO we should handle only devices described in XML configuration and "default" one */
     if ((devices & AUDIO_DEVICE_BIT_IN) != 0) {
-        ALOGE("Failed. Incorrect device type. -EINVAL");
+        ALOGE("Failed. Only AUDIO_DEVICE_OUT_* device type is supported.");
         *stream_out = NULL;
         pthread_mutex_unlock(&xdev->lock);
         return -EINVAL;
     }
-
-    /* TODO define card_id and dev_id for stream, using provided parameters:
-       devices, flags, address, source */
-
-    res = out_create(dev, handle, devices, card_id, dev_id, config, stream_out);
-    if (*stream_out != NULL) {
-        xdev->xout_stream = (x_stream_out_t*)(*stream_out);
-        if (xdev->master_is_muted) {
-            out_set_mute(xdev->xout_stream, true);
+    /* For now we have one card, so card id is always constant. Get device id,
+     * taking into consideration two predefined scenarios:
+     * - We have buses. In this case get device id from address parameter.
+     * - We have no buses. In this case we assume single output device. */
+    if ((devices & AUDIO_DEVICE_OUT_BUS) != AUDIO_DEVICE_OUT_BUS) {
+        /* If requested device is not bus then open it on pcmC0D0 */
+        dev_id = 0;
+    } else {
+        /* We expect, same as parser in car audio service, that address has format "bus%d_%s".
+         * In other words, we expect that bus address starts with 'bus',
+         * followed by bus number, which is followed by '_' and voluntary description. */
+        if (sscanf(address, "bus%u", &dev_id) != 1) {
+            ALOGE("Address format is not supported."
+                  "Expect 'bus%%d_%%s': 'bus' word, bus number, '_', description.");
+            dev_id = NUMBER_OF_DEVICES_OUT;
         }
     }
-    ALOGD("Created stream_out:%p", *stream_out);
+
+    if (dev_id < NUMBER_OF_DEVICES_OUT) {
+        if (xdev->xout_streams[dev_id] == 0) {
+            /* create new stream on free device */
+            res = out_create(dev, handle, devices, CARD_ID, dev_id, config, stream_out);
+            if (*stream_out != NULL) {
+                xdev->xout_streams[dev_id] = (x_stream_out_t*)(*stream_out);
+                if (xdev->master_is_muted) {
+                    out_set_mute(xdev->xout_streams[dev_id], true);
+                }
+                ALOGD("Created stream_out:%p", *stream_out);
+            }
+            /* if out_create failed then 'res' has 'failed' value and it will be reported up */
+        } else {
+            res = -ENOMEM;
+            ALOGE("Output stream for this device already exists.");
+        }
+    } else {
+        res = -EINVAL;
+        ALOGE("Can't create output stream on incorrect device.");
+    }
 
     pthread_mutex_unlock(&xdev->lock);
     return res;
@@ -343,17 +375,22 @@ int adev_open_output_stream(struct audio_hw_device *dev,
 void adev_close_output_stream(struct audio_hw_device *dev, struct audio_stream_out* stream_out)
 {
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    int i = 0;
 
     LOG_FN_NAME_WITH_ARGS("(%p, %p)", dev, stream_out);
     if ((dev == NULL) || (stream_out == NULL)) {
         return;
     }
     pthread_mutex_lock(&xdev->lock);
-    if (xdev->xout_stream == (x_stream_out_t*)stream_out) {
-        out_destroy(xdev->xout_stream);
-        xdev->xout_stream = NULL;
-    } else {
-        ALOGE("Called for incorrect stream. Expected:%p", xdev->xout_stream);
+    for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
+        if (xdev->xout_streams[i] == (x_stream_out_t*)stream_out) {
+            out_destroy(xdev->xout_streams[i]);
+            xdev->xout_streams[i] = NULL;
+            break;
+        }
+    }
+    if (i == NUMBER_OF_DEVICES_OUT) {
+        ALOGE("close_output_stream() called for unknown stream: %p", stream_out);
     }
     pthread_mutex_unlock(&xdev->lock);
 }
@@ -444,6 +481,7 @@ int adev_get_microphones(const struct audio_hw_device *dev,
 int adev_dump(const struct audio_hw_device *dev, int fd)
 {
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    int i = 0;
 
     LOG_FN_NAME_WITH_ARGS("(%p, fd:%d)", dev, fd);
 
@@ -454,7 +492,9 @@ int adev_dump(const struct audio_hw_device *dev, int fd)
     dprintf(fd, "    mic_is_muted: %s\n", xdev->mic_is_muted ? "true" : "false");
     dprintf(fd, "    master_is_muted: %s\n", xdev->master_is_muted ? "true" : "false");
     dprintf(fd, "    in_stream: %p\n", xdev->xin_stream);
-    dprintf(fd, "    out_stream: %p\n", xdev->xout_stream);
+    for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
+        dprintf(fd, "    out_stream[%d]: %p\n", i, xdev->xout_streams[i]);
+    }
     pthread_mutex_unlock(&xdev->lock);
 
     return 0;
@@ -463,6 +503,7 @@ int adev_dump(const struct audio_hw_device *dev, int fd)
 int adev_set_master_mute(struct audio_hw_device *dev, bool mute)
 {
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    int i = 0;
 
     LOG_FN_NAME_WITH_ARGS("(%p, %s)", dev, mute ? "mute" : "unmute");
     if (dev == NULL) {
@@ -470,8 +511,10 @@ int adev_set_master_mute(struct audio_hw_device *dev, bool mute)
     }
     pthread_mutex_lock(&xdev->lock);
     xdev->master_is_muted = mute;
-    if (xdev->xout_stream != NULL) {
-        out_set_mute(xdev->xout_stream, mute);
+    for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
+        if (xdev->xout_streams[i] != NULL) {
+            out_set_mute(xdev->xout_streams[i], mute);
+        }
     }
     pthread_mutex_unlock(&xdev->lock);
     return 0;
@@ -498,16 +541,17 @@ int adev_create_audio_patch(struct audio_hw_device *dev,
                            const struct audio_port_config *sinks,
                            audio_patch_handle_t *handle)
 {
+    unsigned int i = 0;
     LOG_FN_NAME_WITH_ARGS("(%p, #sources:%d, #sinks:%d, *handle:%d)",
             dev, num_sources, num_sinks, *handle);
-    for (unsigned int i = 0; i < num_sources; i++) {
+    for (i = 0; i < num_sources; i++) {
         LOG_FN_PARAMETERS(
                 "Source[%d].id:%d, role:%d, type:%d, config_mask:0x%x, "
                 "rate:%d, channel_mask:0x%x, format:%d, gain, ext",
                 i, sources[i].id, sources[i].role, sources[i].type, sources[i].config_mask,
                 sources[i].sample_rate, sources[i].channel_mask, sources[i].format);
     }
-    for (unsigned int i = 0; i < num_sinks; i++) {
+    for (i = 0; i < num_sinks; i++) {
         LOG_FN_PARAMETERS("Sink[%d].id:%d, role:%d, type:%d, "
                 "config_mask:0x%x, rate:%d, channel_mask:0x%x, format:%d, gain, ext",
                 i, sinks[i].id, sources[i].role, sinks[i].type, sinks[i].config_mask,
