@@ -184,8 +184,9 @@ int adev_close(hw_device_t *device)
 uint32_t adev_get_supported_devices(const struct audio_hw_device *dev)
 {
     LOG_FN_NAME_WITH_ARGS("(%p)", dev);
-    return (AUDIO_DEVICE_OUT_SPEAKER | AUDIO_DEVICE_OUT_DEFAULT |
-            AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_DEFAULT);
+    return (AUDIO_DEVICE_OUT_BUS | AUDIO_DEVICE_OUT_DEFAULT |
+            AUDIO_DEVICE_IN_BUILTIN_MIC | AUDIO_DEVICE_IN_LINE | AUDIO_DEVICE_IN_BUS |
+            AUDIO_DEVICE_IN_DEFAULT);
 }
 
 int adev_init_check(const struct audio_hw_device *dev)
