@@ -39,12 +39,42 @@
 #include "stream_out.h"
 #include "stream_in.h"
 
+/* Number of supported input devices. Should be in sync with
+ * number of input devices in audio_policy_configuration.xml */
+#define NUMBER_OF_DEVICES_IN 3
+
 /* Number of supported output devices. Should be in sync with
  * number of output buses in audio_policy_configuration.xml */
 #define NUMBER_OF_DEVICES_OUT 8
 
+/* This structure is used for mapping of android's audio devices to 'hardware' devices.
+ * So, request for open stream on specified device is checked using this map.
+ * If device type and bus number (for in/out buses) match to request then
+ * stream will be open on specified card and device (pcmC*D*). */
+typedef struct xa_device_map
+{
+    /* One of the AUDIO_DEVICE_XXX */
+    audio_devices_t device_type_mask;
+    /* Used only for in/out buses. If device type is AUDIO_DEVICE_*_BUS,
+     * then bus number will be checked (e.g. 5 for bus5_out_alarm) */
+    unsigned int bus_number;
+    /* pcm card index, as used in /dev/snd/pcmC*D* */
+    unsigned int pcm_card;
+    /* pcm device index, as used in /dev/snd/pcmC*D* */
+    unsigned int pcm_device;
+} xa_device_map_t;
+
+/* map for input devices */
+xa_device_map_t xa_input_map[NUMBER_OF_DEVICES_IN] =
+{
+    {AUDIO_DEVICE_IN_BUILTIN_MIC, 0, 0, 0},
+    {AUDIO_DEVICE_IN_LINE, 0, 0, 0},
+    {AUDIO_DEVICE_IN_BUS, 0, 0, 0},
+};
+
+
 typedef struct x_audio_device {
-    /* NOTE audio_hw_device_t MUST be very first member of structure */
+    /* NOTE: audio_hw_device_t MUST be very first member of structure */
     audio_hw_device_t hw_device;
     pthread_mutex_t lock;
     /* device specific properties */
@@ -52,7 +82,7 @@ typedef struct x_audio_device {
     uint32_t periods_per_buffer;
     bool mic_is_muted;
     bool master_is_muted;
-    x_stream_in_t * xin_stream;
+    x_stream_in_t * xin_streams[NUMBER_OF_DEVICES_IN];
     x_stream_out_t * xout_streams[NUMBER_OF_DEVICES_OUT];
 } x_audio_device_t;
 
@@ -160,8 +190,11 @@ int adev_close(hw_device_t *device)
     ref_counter--;
     if (ref_counter == 0) {
         /* close streams and release resources */
-        if (xadev->xin_stream != NULL) {
-            in_destroy(xadev->xin_stream);
+        for (i = 0; i < NUMBER_OF_DEVICES_IN; i++) {
+            if (xadev->xin_streams[i] != NULL) {
+                in_destroy(xadev->xin_streams[i]);
+                xadev->xin_streams[i] = NULL;
+            }
         }
         for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
             if (xadev->xout_streams[i] != NULL) {
@@ -226,6 +259,7 @@ int adev_set_mode(struct audio_hw_device *dev, audio_mode_t mode)
 int adev_set_mic_mute(struct audio_hw_device *dev, bool state)
 {
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    unsigned int i;
 
     LOG_FN_NAME_WITH_ARGS("(%p, %s)", dev, state ? "mute" : "unmute");
     if (dev == NULL) {
@@ -233,10 +267,12 @@ int adev_set_mic_mute(struct audio_hw_device *dev, bool state)
     }
     pthread_mutex_lock(&xdev->lock);
     xdev->mic_is_muted = state;
-    if (xdev->xin_stream != NULL) {
-        in_set_mute(xdev->xin_stream, state);
+    for (i = 0; i < NUMBER_OF_DEVICES_IN; i++) {
+        if (xdev->xin_streams[i] != NULL) {
+            in_set_mute(xdev->xin_streams[i], state);
+            xdev->xin_streams[i] = NULL;
+        }
     }
-
     pthread_mutex_unlock(&xdev->lock);
     return 0;
 }
@@ -406,9 +442,10 @@ int adev_open_input_stream(struct audio_hw_device *dev,
                          audio_source_t source)
 {
     int res = 0;
-    unsigned int card_id = CARD_ID;
-    unsigned int dev_id = DEVICE_ID_RECORD;
+    unsigned int pcm_card = CARD_ID;
+    unsigned int pcm_device = DEVICE_ID_RECORD;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    unsigned int slot;
 
     pthread_mutex_lock(&xdev->lock);
 
@@ -428,7 +465,6 @@ int adev_open_input_stream(struct audio_hw_device *dev,
         return -EINVAL;
     }
     /* check requested device */
-    /* TODO we should handle only devices described in XML configuration and "default" one */
     if ((devices & AUDIO_DEVICE_BIT_IN) == 0) {
         ALOGE("Failed. Incorrect device type. -EINVAL");
         *stream_in = NULL;
@@ -436,17 +472,45 @@ int adev_open_input_stream(struct audio_hw_device *dev,
         return -EINVAL;
     }
 
-    /* TODO define card_id and dev_id for stream, using provided parameters:
-       devices, flags, address, source */
-
-    res = in_create(dev, handle, devices, card_id, dev_id, config, stream_in);
-    if (*stream_in != NULL) {
-        xdev->xin_stream = (x_stream_in_t*)(*stream_in);
-        if (xdev->mic_is_muted) {
-            in_set_mute(xdev->xin_stream, true);
+    /* Identify pcm device */
+    for (slot = 0; slot < NUMBER_OF_DEVICES_IN; slot++) {
+        if ((devices & xa_input_map[slot].device_type_mask) != 0) {
+            if (xa_input_map[slot].device_type_mask == AUDIO_DEVICE_IN_BUS) {
+                if (sscanf(address, "bus%u", &pcm_device) == 1) {
+                    pcm_card = xa_input_map[slot].pcm_card;
+                    pcm_device = xa_input_map[slot].pcm_device;
+                    /* device is identified, stop scanning of map */
+                    break;
+                } else {
+                    /* if bus address is incorrect, continue scanning of map */
+                }
+            } else {
+                pcm_card = xa_input_map[slot].pcm_card;
+                pcm_device = xa_input_map[slot].pcm_device;
+                /* device is identified, stop scanning of map */
+                break;
+            }
         }
     }
-    ALOGD("Created stream_in:%p", *stream_in);
+
+    if (slot < NUMBER_OF_DEVICES_IN) {
+        if (xdev->xin_streams[slot] == NULL) {
+            res = in_create(dev, handle, devices, pcm_card, pcm_device, config, stream_in);
+            if (*stream_in != NULL) {
+                xdev->xin_streams[slot] = (x_stream_in_t*)(*stream_in);
+                if (xdev->mic_is_muted) {
+                    in_set_mute(xdev->xin_streams[slot], true);
+                }
+            }
+            LOG_FN_PARAMETERS("Created stream_in:%p", *stream_in);
+        } else {
+            res = -EEXIST;
+            ALOGE("Input stream for this device already exists.");
+        }
+    } else {
+        res = -EINVAL;
+        ALOGE("Can't create input stream on incorrect device.");
+    }
 
     pthread_mutex_unlock(&xdev->lock);
     return res;
@@ -455,17 +519,22 @@ int adev_open_input_stream(struct audio_hw_device *dev,
 void adev_close_input_stream(struct audio_hw_device *dev, struct audio_stream_in *stream_in)
 {
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    unsigned int i;
 
     LOG_FN_NAME_WITH_ARGS("(%p, %p)", dev, stream_in);
     if ((dev == NULL) || (stream_in == NULL)) {
         return;
     }
     pthread_mutex_lock(&xdev->lock);
-    if (xdev->xin_stream == (x_stream_in_t*)stream_in) {
-        in_destroy(xdev->xin_stream);
-        xdev->xin_stream = NULL;
-    } else {
-        ALOGE("Called for incorrect stream. Expected:%p", xdev->xin_stream);
+    for (i = 0; i < NUMBER_OF_DEVICES_IN; i++) {
+        if (xdev->xin_streams[i] == (x_stream_in_t*)stream_in) {
+            in_destroy(xdev->xin_streams[i]);
+            xdev->xin_streams[i] = NULL;
+            break;
+        }
+    }
+    if (i == NUMBER_OF_DEVICES_IN) {
+        ALOGE("close_input_stream() called for unknown stream: %p", stream_in);
     }
     pthread_mutex_unlock(&xdev->lock);
 }
@@ -482,7 +551,7 @@ int adev_get_microphones(const struct audio_hw_device *dev,
 int adev_dump(const struct audio_hw_device *dev, int fd)
 {
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
-    int i = 0;
+    int i;
 
     LOG_FN_NAME_WITH_ARGS("(%p, fd:%d)", dev, fd);
 
@@ -492,7 +561,9 @@ int adev_dump(const struct audio_hw_device *dev, int fd)
     dprintf(fd, "    periods_per_buffer: %u\n", xdev->periods_per_buffer);
     dprintf(fd, "    mic_is_muted: %s\n", xdev->mic_is_muted ? "true" : "false");
     dprintf(fd, "    master_is_muted: %s\n", xdev->master_is_muted ? "true" : "false");
-    dprintf(fd, "    in_stream: %p\n", xdev->xin_stream);
+    for (i = 0; i < NUMBER_OF_DEVICES_IN; i++) {
+        dprintf(fd, "    in_stream[%d]: %p\n", i, xdev->xin_streams[i]);
+    }
     for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
         dprintf(fd, "    out_stream[%d]: %p\n", i, xdev->xout_streams[i]);
     }
