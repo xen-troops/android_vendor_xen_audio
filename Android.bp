@@ -35,5 +35,6 @@ cc_library_shared {
     ],
     cflags: [
         "-Wno-unused-parameter",
+        "-DLOG_FUNC_TRACES=0",
     ],
 }
