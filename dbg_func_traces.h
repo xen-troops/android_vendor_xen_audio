@@ -34,5 +34,20 @@
 #define LOG_FN_NAME_WITH_ARGS(...) (void)(0)
 #endif  /* LOG_FUNC_TRACES */
 
+const char * xa_dbgstr_port_role(audio_port_role_t value);
+
+const char * xa_dbgstr_port_type(audio_port_type_t value);
+
+const char * xa_dbgstr_port_config_mask(unsigned int value);
+
+const char * xa_dbgstr_input_flags(unsigned int value);
+
+const char * xa_dbgstr_output_flags(unsigned int value);
+
+const char * xa_dbgstr_format(audio_format_t value);
+
+const char * xa_dbgstr_source(audio_source_t value);
+
+const char * xa_dbgstr_device(audio_devices_t value);
 
 #endif /* VENDOR_XEN_AUDIO_DBG_FUNC_TRACES_H_ */
