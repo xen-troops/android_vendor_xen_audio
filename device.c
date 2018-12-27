@@ -342,9 +342,9 @@ int adev_open_output_stream(struct audio_hw_device *dev,
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
 
     LOG_FN_NAME_WITH_ARGS(
-            "(%p, handle:%d, devices:0x%x, flags:0x%x, "
+            "(%p, handle:%d, devices:%s(0x%x), flags:%s(0x%x), "
             "rate:%d, channel_mask:0x%x, format:0x%x, address:'%s')",
-            dev, handle, devices, flags,
+            dev, handle, xa_dbgstr_device(devices), devices, xa_dbgstr_output_flags(flags), flags,
             config->sample_rate, config->channel_mask, config->format,
             address);
 
@@ -449,9 +449,12 @@ int adev_open_input_stream(struct audio_hw_device *dev,
 
     pthread_mutex_lock(&xdev->lock);
 
-    LOG_FN_NAME_WITH_ARGS("(%p, handle:0x%x, devices:0x%x, flags:0x%x, address:'%s', source:%d)",
-            dev, handle, devices, flags, address, source);
-    LOG_FN_PARAMETERS("Rate:%d, channel_mask:0x%x, format:0x%x, offload.size:%d, frame_count:%d ",
+    LOG_FN_NAME_WITH_ARGS("(%p, handle:0x%x, devices:%s(0x%x),",
+            dev, handle, xa_dbgstr_device(devices), devices);
+    LOG_FN_PARAMETERS("flags:%s(0x%x), address:'%s', source:%s(%d))",
+            xa_dbgstr_input_flags(flags), flags, address, xa_dbgstr_source(source), source);
+    LOG_FN_PARAMETERS(
+            "Rate:%d, channel_mask:0x%x, format:0x%x, offload.size:%d, frame_count:%d ",
             config->sample_rate, config->channel_mask, config->format,
             config->offload_info.size, config->frame_count);
 
@@ -659,8 +662,15 @@ int adev_set_audio_port_config(struct audio_hw_device *dev, const struct audio_p
         return -EINVAL;
     }
 
-    LOG_FN_NAME_WITH_ARGS("(%p, id:%d, role:%d, type:%d, config_mask:0x%x)",
-            dev, config->id, config->role, config->type, config->config_mask);
+    LOG_FN_NAME_WITH_ARGS("(%p, id:%d, role:%s(%d), type:%s(%d), config_mask:%s(0x%x))",
+            dev,
+            config->id,
+            xa_dbgstr_port_role(config->role),
+            config->role,
+            xa_dbgstr_port_type(config->type),
+            config->type,
+            xa_dbgstr_port_config_mask(config->config_mask),
+            config->config_mask);
 
     /* check that we are called for correct port type */
     switch (config->type) {
@@ -694,7 +704,7 @@ int adev_set_audio_port_config(struct audio_hw_device *dev, const struct audio_p
         /* set new value */
     }
     if ((config->config_mask & AUDIO_PORT_CONFIG_FORMAT) != 0) {
-        LOG_FN_PARAMETERS("format:%d", config->format);
+        LOG_FN_PARAMETERS("format:%s(%d)", xa_dbgstr_format(config->format), config->format);
         /* has supported value? */
         /* set new value */
     }
