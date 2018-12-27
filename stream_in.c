@@ -57,7 +57,7 @@ size_t in_get_buffer_size(const struct audio_stream *stream)
     LOG_FN_NAME_WITH_ARGS("(%p)", stream);
     pthread_mutex_lock(&xin->lock);
     bytes = xin->p_config.period_size * xin->frame_size;
-    ALOGD("Calculated buffer_size:%zu", bytes);
+    LOG_FN_PARAMETERS("Calculated buffer_size:%zu", bytes);
     pthread_mutex_unlock(&xin->lock);
     return bytes;
 }
@@ -89,7 +89,7 @@ int in_standby(struct audio_stream *stream)
 
     pthread_mutex_lock(&xin->lock);
     if (xin->standby) {
-        ALOGV("In standby already.");
+        LOG_FN_PARAMETERS("In standby already.");
     } else {
         xin->standby = true;
         /* close pcm device */
@@ -219,7 +219,7 @@ ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
     pcm_res = pcm_read(xin->p_handle, buffer, bytes);
 
     if (pcm_res < 0) {
-        ALOGD("Read failed with %d '%s'", pcm_res, pcm_get_error(xin->p_handle));
+        ALOGE("Read failed with %d '%s'", pcm_res, pcm_get_error(xin->p_handle));
         ret_code = pcm_res;
     } else {
         if (xin->muted) {
@@ -263,8 +263,6 @@ int in_get_capture_position(const struct audio_stream_in *stream,
     if (time != NULL) {
         *time = xin->last_time;
     }
-    /* this trace generates lots of messages */
-    /* ALOGD("igcp: %" PRIu64 ", %" PRIu64, xin->read_frames, xin->last_time); */
 
     return 0;
 }
@@ -393,11 +391,11 @@ int in_create(struct audio_hw_device *dev,
     /* this can be called only when 'common' fields are initialized
        frame_size changes rarely, so we can store it precalculated */
     xin->frame_size = audio_stream_in_frame_size(&xin->astream);
-    ALOGD("Calculated xin->frame_size:%zu", xin->frame_size);
+    LOG_FN_PARAMETERS("Calculated xin->frame_size:%zu", xin->frame_size);
 
     xin->p_handle = pcm_open(hw_card_id, hw_device_id, PCM_IN, &(xin->p_config));
     if ((xin->p_handle == NULL) || (!pcm_is_ready(xin->p_handle))) {
-        ALOGE("%s failed. Can't open stream on device.", __FUNCTION__);
+        ALOGE("%s() failed (%d). Can't open stream on device.", __FUNCTION__, errno);
         if (xin->p_handle != NULL) {
             pcm_close(xin->p_handle);
             xin->p_handle = NULL;

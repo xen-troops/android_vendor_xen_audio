@@ -113,7 +113,7 @@ int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
 
     if (ref_counter != 0) {
         *device = &xadev->hw_device.common;
-        ALOGD("Return existing device:%p", *device);
+        LOG_FN_PARAMETERS("Return existing device:%p", *device);
     } else {
         /* initialize new audio device */
         xadev = calloc(1, sizeof(*xadev));
@@ -129,7 +129,7 @@ int adev_open(const hw_module_t* module, const char* name, hw_device_t** device)
         xadev->hw_device.common.module = (hw_module_t*)module;
         xadev->hw_device.common.close = adev_close;
         *device = &xadev->hw_device.common;
-        ALOGD("Created device:%p", *device);
+        LOG_FN_PARAMETERS("Created device:%p", *device);
 
         xadev->hw_device.get_supported_devices = adev_get_supported_devices;
         xadev->hw_device.init_check = adev_init_check;
@@ -206,7 +206,7 @@ int adev_close(hw_device_t *device)
         free(xadev);
         xadev = NULL;
     } else {
-        ALOGD("Decremented ref_counter:%d", ref_counter);
+        LOG_FN_PARAMETERS("Decremented ref_counter:%d", ref_counter);
     }
 
     pthread_mutex_unlock(&xadev_init_lock);
@@ -393,7 +393,7 @@ int adev_open_output_stream(struct audio_hw_device *dev,
                 if (xdev->master_is_muted) {
                     out_set_mute(xdev->xout_streams[dev_id], true);
                 }
-                ALOGD("Created stream_out:%p", *stream_out);
+                LOG_FN_PARAMETERS("Created stream_out:%p", *stream_out);
             }
             /* if out_create failed then 'res' has 'failed' value and it will be reported up */
         } else {
