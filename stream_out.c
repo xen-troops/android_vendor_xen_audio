@@ -88,7 +88,7 @@ int out_standby(struct audio_stream *stream)
 
     pthread_mutex_lock(&xout->lock);
     if (xout->standby) {
-        ALOGV("In standby already.");
+        LOG_FN_PARAMETERS("In standby already.");
     } else {
         xout->standby = true;
         /* close pcm device */
@@ -325,10 +325,6 @@ int out_get_presentation_position(const struct audio_stream_out *stream,
     }
     if (timestamp != NULL) {
         memcpy(timestamp, &xout->last_timestamp, sizeof(struct timespec));
-        /*
-        ALOGD("ogppos: %" PRIu64 ", %ld.%ld",
-          xout->written_frames, xout->last_timestamp.tv_sec, xout->last_timestamp.tv_nsec);
-        */
     }
     pthread_mutex_unlock(&xout->lock);
 
@@ -430,7 +426,7 @@ int out_create(struct audio_hw_device *dev,
     xout->p_config.format = xa_config_default.format;
     /* precalculate buffer related latency */
     xout->buffer_latency = (xout->p_config.period_size * xout->p_config.period_count * 1000) / xout->p_config.rate;
-    ALOGD("Calculated buffer_latency:%d", xout->buffer_latency);
+    LOG_FN_PARAMETERS("Calculated buffer_latency:%d", xout->buffer_latency);
 
     xout->astream.common.get_sample_rate = out_get_sample_rate;
     xout->astream.common.set_sample_rate = out_set_sample_rate;
@@ -464,13 +460,12 @@ int out_create(struct audio_hw_device *dev,
     /* this can be called only when 'common' fields are initialized
        frame_size changes rarely, so we can store it precalculated */
     xout->frame_size = audio_stream_out_frame_size(&xout->astream);
-    ALOGD("Calculated xout->frame_size:%zu", xout->frame_size);
+    LOG_FN_PARAMETERS("Calculated xout->frame_size:%zu", xout->frame_size);
 
     /* connect to hardware */
     xout->p_handle = pcm_open(xout->p_card_id, xout->p_dev_id, PCM_OUT, &(xout->p_config));
     if ((xout->p_handle == NULL) || (!pcm_is_ready(xout->p_handle))) {
-        ALOGE("%s failed. Can't open stream on device. -ENOMEM", __FUNCTION__);
-
+        ALOGE("%s() failed (%d). Can't open stream on device.", __FUNCTION__, errno);
         if (xout->p_handle != NULL) {
             pcm_close(xout->p_handle);
             xout->p_handle = NULL;
