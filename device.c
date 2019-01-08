@@ -421,7 +421,7 @@ int adev_open_input_stream(struct audio_hw_device *dev,
     /* is requested configuration supported? */
 
     /* check input parameters */
-    if (!is_config_supported_out(config)) {
+    if (!is_config_supported_in(config)) {
         ALOGE("Failed. Not supported audio configuration. -EINVAL");
         *stream_in = NULL;
         pthread_mutex_unlock(&xdev->lock);
