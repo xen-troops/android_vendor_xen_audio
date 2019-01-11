@@ -397,7 +397,7 @@ int adev_open_output_stream(struct audio_hw_device *dev,
             }
             /* if out_create failed then 'res' has 'failed' value and it will be reported up */
         } else {
-            res = -ENOMEM;
+            res = -EEXIST;
             ALOGE("Output stream for this device already exists.");
         }
     } else {
