@@ -36,9 +36,11 @@ const struct pcm_config xa_config_default = {
     .format = PCM_FORMAT_S16_LE,
 };
 
-const unsigned int xa_supported_channels[] = {1, 2};
+const unsigned int xa_supported_channels_out[] = {2};
+const unsigned int xa_supported_channels_in[] = {1, 2};
 /* sample rates */
-const unsigned int xa_supported_rates[] = {48000};
+const unsigned int xa_supported_rates_out[] = {48000};
+const unsigned int xa_supported_rates_in[] = {8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000};
 /* android-side formats */
 const unsigned int xa_supported_aformats[] = {AUDIO_FORMAT_PCM_16_BIT};
 
@@ -64,9 +66,9 @@ bool is_config_supported_in(const audio_config_t * config)
 
     /* channels */
     channels = audio_channel_count_from_in_mask(config->channel_mask);
-    size = sizeof(xa_supported_channels)/sizeof(xa_supported_channels[0]);
+    size = sizeof(xa_supported_channels_in)/sizeof(xa_supported_channels_in[0]);
     for (i = 0; i < size; i++) {
-        if (xa_supported_channels[i] == channels) {
+        if (xa_supported_channels_in[i] == channels) {
             break;
         }
     }
@@ -76,9 +78,9 @@ bool is_config_supported_in(const audio_config_t * config)
     }
 
     /* sample rate */
-    size = sizeof(xa_supported_rates)/sizeof(xa_supported_rates[0]);
+    size = sizeof(xa_supported_rates_in)/sizeof(xa_supported_rates_in[0]);
     for (i = 0; i < size; i++) {
-        if (xa_supported_rates[i] == config->sample_rate) {
+        if (xa_supported_rates_in[i] == config->sample_rate) {
             break;
         }
     }
@@ -111,9 +113,9 @@ bool is_config_supported_out(const audio_config_t * config)
 
     /* channels */
     channels = audio_channel_count_from_out_mask(config->channel_mask);
-    size = sizeof(xa_supported_channels)/sizeof(xa_supported_channels[0]);
+    size = sizeof(xa_supported_channels_out)/sizeof(xa_supported_channels_out[0]);
     for (i = 0; i < size; i++) {
-        if (xa_supported_channels[i] == channels) {
+        if (xa_supported_channels_out[i] == channels) {
             break;
         }
     }
@@ -123,9 +125,9 @@ bool is_config_supported_out(const audio_config_t * config)
     }
 
     /* sample rate */
-    size = sizeof(xa_supported_rates)/sizeof(xa_supported_rates[0]);
+    size = sizeof(xa_supported_rates_out)/sizeof(xa_supported_rates_out[0]);
     for (i = 0; i < size; i++) {
-        if (xa_supported_rates[i] == config->sample_rate) {
+        if (xa_supported_rates_out[i] == config->sample_rate) {
             break;
         }
     }
