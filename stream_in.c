@@ -336,6 +336,7 @@ int in_create(struct audio_hw_device *dev,
        connect to specified hardware */
 
     x_stream_in_t *xin = NULL;
+    int error_code;
 
     xin = (x_stream_in_t*)calloc(1, sizeof(x_stream_in_t));
     if (xin == NULL) {
@@ -395,14 +396,16 @@ int in_create(struct audio_hw_device *dev,
 
     xin->p_handle = pcm_open(hw_card_id, hw_device_id, PCM_IN, &(xin->p_config));
     if ((xin->p_handle == NULL) || (!pcm_is_ready(xin->p_handle))) {
-        ALOGE("%s() failed (%d). Can't open stream on device.", __FUNCTION__, errno);
+        error_code = errno;  /* store errno to avoid possible overwrite */
+        ALOGE("%s() failed (%d). Can't open stream on device.", __FUNCTION__, error_code);
         if (xin->p_handle != NULL) {
+            ALOGE("pcm error:'%s'", pcm_get_error(xin->p_handle));
             pcm_close(xin->p_handle);
             xin->p_handle = NULL;
         }
         *stream_in = NULL;
         free(xin);
-        return -ENOMEM;
+        return -error_code;
     }
 
     *stream_in = &(xin->astream);
