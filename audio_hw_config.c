@@ -36,6 +36,45 @@ const struct pcm_config xa_config_default = {
     .format = PCM_FORMAT_S16_LE,
 };
 
+/* map for input devices */
+xa_device_map_t xa_input_map[NUMBER_OF_DEVICES_IN] =
+{
+    /* Built-In Mic */
+    {AUDIO_DEVICE_IN_BUILTIN_MIC, 0, 0, 0, 512, 2},
+    /* Line In */
+    {AUDIO_DEVICE_IN_LINE, 0, 0, 0, 512, 2},
+    /* bus0_in */
+    {AUDIO_DEVICE_IN_BUS, 0, 0, 0, 512, 2},
+};
+
+/* map for output devices */
+/* timings for 48000:
+ *    256 frames -   5.33 ms - fast (<= 5 ms)
+ *    512 frames -  10.66 ms
+ *   1024 frames -  21.33 ms - normal (~20 ms)
+ *   2048 frames -  42.67 ms
+ *   8192 frames - 170.66 ms - deep (>= 100 ms)
+ */
+xa_device_map_t xa_output_map[NUMBER_OF_DEVICES_OUT] =
+{
+    /* media */
+    {AUDIO_DEVICE_OUT_BUS, 0, 0, 0, 2048, 4},
+    /* navigation */
+    {AUDIO_DEVICE_OUT_BUS, 1, 0, 1,  512, 2},
+    /* voice command */
+    {AUDIO_DEVICE_OUT_BUS, 2, 0, 2,  512, 2},
+    /* call ring */
+    {AUDIO_DEVICE_OUT_BUS, 3, 0, 3,  512, 2},
+    /* call */
+    {AUDIO_DEVICE_OUT_BUS, 4, 0, 4,  512, 2},
+    /* alarm */
+    {AUDIO_DEVICE_OUT_BUS, 5, 0, 5,  512, 2},
+    /* notification */
+    {AUDIO_DEVICE_OUT_BUS, 6, 0, 6,  512, 2},
+    /* system sound */
+    {AUDIO_DEVICE_OUT_BUS, 7, 0, 7,  512, 2},
+};
+
 const unsigned int xa_supported_channels_out[] = {2};
 const unsigned int xa_supported_channels_in[] = {1, 2};
 /* sample rates */
