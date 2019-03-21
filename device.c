@@ -39,40 +39,6 @@
 #include "stream_out.h"
 #include "stream_in.h"
 
-/* Number of supported input devices. Should be in sync with
- * number of input devices in audio_policy_configuration.xml */
-#define NUMBER_OF_DEVICES_IN 3
-
-/* Number of supported output devices. Should be in sync with
- * number of output buses in audio_policy_configuration.xml */
-#define NUMBER_OF_DEVICES_OUT 8
-
-/* This structure is used for mapping of android's audio devices to 'hardware' devices.
- * So, request for open stream on specified device is checked using this map.
- * If device type and bus number (for in/out buses) match to request then
- * stream will be open on specified card and device (pcmC*D*). */
-typedef struct xa_device_map
-{
-    /* One of the AUDIO_DEVICE_XXX */
-    audio_devices_t device_type_mask;
-    /* Used only for in/out buses. If device type is AUDIO_DEVICE_*_BUS,
-     * then bus number will be checked (e.g. 5 for bus5_out_alarm) */
-    unsigned int bus_number;
-    /* pcm card index, as used in /dev/snd/pcmC*D* */
-    unsigned int pcm_card;
-    /* pcm device index, as used in /dev/snd/pcmC*D* */
-    unsigned int pcm_device;
-} xa_device_map_t;
-
-/* map for input devices */
-xa_device_map_t xa_input_map[NUMBER_OF_DEVICES_IN] =
-{
-    {AUDIO_DEVICE_IN_BUILTIN_MIC, 0, 0, 0},
-    {AUDIO_DEVICE_IN_LINE, 0, 0, 0},
-    {AUDIO_DEVICE_IN_BUS, 0, 0, 0},
-};
-
-
 typedef struct x_audio_device {
     /* NOTE: audio_hw_device_t MUST be very first member of structure */
     audio_hw_device_t hw_device;
@@ -338,8 +304,10 @@ int adev_open_output_stream(struct audio_hw_device *dev,
                           const char *address)
 {
     int res = 0;
-    unsigned int dev_id = NUMBER_OF_DEVICES_OUT;  /* out of range value */
+    unsigned int pcm_card;
+    unsigned int pcm_device;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    unsigned int slot;
 
     LOG_FN_NAME_WITH_ARGS(
             "(%p, handle:%d, devices:%s(0x%x), flags:%s(0x%x), "
@@ -366,32 +334,46 @@ int adev_open_output_stream(struct audio_hw_device *dev,
         pthread_mutex_unlock(&xdev->lock);
         return -EINVAL;
     }
-    /* For now we have one card, so card id is always constant. Get device id,
-     * taking into consideration two predefined scenarios:
-     * - We have buses. In this case get device id from address parameter.
-     * - We have no buses. In this case we assume single output device. */
-    if ((devices & AUDIO_DEVICE_OUT_BUS) != AUDIO_DEVICE_OUT_BUS) {
-        /* If requested device is not bus then open it on pcmC0D0 */
-        dev_id = 0;
-    } else {
-        /* We expect, same as parser in car audio service, that address has format "bus%d_%s".
-         * In other words, we expect that bus address starts with 'bus',
-         * followed by bus number, which is followed by '_' and voluntary description. */
-        if (sscanf(address, "bus%u", &dev_id) != 1) {
-            ALOGE("Address format is not supported."
-                  "Expect 'bus%%d_%%s': 'bus' word, bus number, '_', description.");
-            dev_id = NUMBER_OF_DEVICES_OUT;
+
+    /* Identify PCM card and device */
+    /* We iterate through xa_output_map looking for device_type.
+     * If device type is audio bus, we check bus number also. */
+    for (slot = 0; slot < NUMBER_OF_DEVICES_OUT; slot++) {
+        if ((devices & xa_output_map[slot].device_type_mask) != 0) {
+            if (xa_output_map[slot].device_type_mask == AUDIO_DEVICE_OUT_BUS) {
+                /* We expect that address has format "bus%d_%s".
+                 * In other words, we expect that bus address starts with 'bus',
+                 * followed by bus number, which is followed by '_' and voluntary description.
+                 * Parser in car audio service was used as reference. */
+                if (sscanf(address, "bus%u", &pcm_device) == 1) {
+                    pcm_card = xa_output_map[slot].pcm_card;
+                    pcm_device = xa_output_map[slot].pcm_device;
+                    /* device is identified, stop scanning of map */
+                    break;
+                } else {
+                    /* if bus address is incorrect, continue scanning of map */
+                    ALOGE("%s: 'address' has not supported format and was skipped."
+                          " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
+                          __FUNCTION__);
+                }
+            } else {
+                /* if we have request to open non-bus device, just use card and device id */
+                pcm_card = xa_output_map[slot].pcm_card;
+                pcm_device = xa_output_map[slot].pcm_device;
+                /* device is identified, stop scanning of map */
+                break;
+            }
         }
     }
 
-    if (dev_id < NUMBER_OF_DEVICES_OUT) {
-        if (xdev->xout_streams[dev_id] == 0) {
+    if (slot < NUMBER_OF_DEVICES_OUT) {
+        if (xdev->xout_streams[pcm_device] == NULL) {
             /* create new stream on free device */
-            res = out_create(dev, handle, devices, CARD_ID, dev_id, config, stream_out);
+            res = out_create(dev, handle, devices, pcm_card, pcm_device, config, stream_out);
             if (*stream_out != NULL) {
-                xdev->xout_streams[dev_id] = (x_stream_out_t*)(*stream_out);
+                xdev->xout_streams[pcm_device] = (x_stream_out_t*)(*stream_out);
                 if (xdev->master_is_muted) {
-                    out_set_mute(xdev->xout_streams[dev_id], true);
+                    out_set_mute(xdev->xout_streams[pcm_device], true);
                 }
                 LOG_FN_PARAMETERS("Created stream_out:%p", *stream_out);
             }
@@ -402,7 +384,7 @@ int adev_open_output_stream(struct audio_hw_device *dev,
         }
     } else {
         res = -EINVAL;
-        ALOGE("Can't create output stream on incorrect device.");
+        ALOGE("Can't create output stream. Corresponding device was not found.");
     }
 
     pthread_mutex_unlock(&xdev->lock);
@@ -442,8 +424,8 @@ int adev_open_input_stream(struct audio_hw_device *dev,
                          audio_source_t source)
 {
     int res = 0;
-    unsigned int pcm_card = CARD_ID;
-    unsigned int pcm_device = DEVICE_ID_RECORD;
+    unsigned int pcm_card;
+    unsigned int pcm_device;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
     unsigned int slot;
 
