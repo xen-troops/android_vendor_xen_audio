@@ -274,9 +274,9 @@ char * adev_get_parameters(const struct audio_hw_device *dev, const char *keys)
 size_t adev_get_input_buffer_size(const struct audio_hw_device *dev,
                                 const struct audio_config *config)
 {
-    size_t buf_size = 0;
-    uint32_t channels = xa_config_default.channels;
-    unsigned int sample_size = 0;
+    size_t buf_size;
+    uint32_t channels;
+    unsigned int sample_size;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
 
     LOG_FN_NAME_WITH_ARGS(
@@ -304,8 +304,7 @@ int adev_open_output_stream(struct audio_hw_device *dev,
                           const char *address)
 {
     int res = 0;
-    unsigned int pcm_card;
-    unsigned int pcm_device;
+    unsigned int bus_number;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
     unsigned int slot;
 
@@ -345,21 +344,21 @@ int adev_open_output_stream(struct audio_hw_device *dev,
                  * In other words, we expect that bus address starts with 'bus',
                  * followed by bus number, which is followed by '_' and voluntary description.
                  * Parser in car audio service was used as reference. */
-                if (sscanf(address, "bus%u", &pcm_device) == 1) {
-                    pcm_card = xa_output_map[slot].pcm_card;
-                    pcm_device = xa_output_map[slot].pcm_device;
-                    /* device is identified, stop scanning of map */
-                    break;
+                if (sscanf(address, "bus%u", &bus_number) == 1) {
+                    if (bus_number == xa_output_map[slot].bus_number) {
+                        /* device is identified, stop scanning of map */
+                        break;
+                    } else {
+                        /* requested bus number is not equal to bus number in slot,
+                         * continue scanning */
+                    }
                 } else {
                     /* if bus address is incorrect, continue scanning of map */
-                    ALOGE("%s: 'address' has not supported format and was skipped."
+                    ALOGW("%s: 'address' has not supported format and was skipped."
                           " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
                           __FUNCTION__);
                 }
             } else {
-                /* if we have request to open non-bus device, just use card and device id */
-                pcm_card = xa_output_map[slot].pcm_card;
-                pcm_device = xa_output_map[slot].pcm_device;
                 /* device is identified, stop scanning of map */
                 break;
             }
@@ -367,17 +366,16 @@ int adev_open_output_stream(struct audio_hw_device *dev,
     }
 
     if (slot < NUMBER_OF_DEVICES_OUT) {
-        if (xdev->xout_streams[pcm_device] == NULL) {
+        if (xdev->xout_streams[slot] == NULL) {
             /* create new stream on free device */
-            res = out_create(dev, handle, devices, pcm_card, pcm_device, config, stream_out);
+            res = out_create(dev, handle, devices, slot, config, stream_out);
             if (*stream_out != NULL) {
-                xdev->xout_streams[pcm_device] = (x_stream_out_t*)(*stream_out);
+                xdev->xout_streams[slot] = (x_stream_out_t*)(*stream_out);
                 if (xdev->master_is_muted) {
-                    out_set_mute(xdev->xout_streams[pcm_device], true);
+                    out_set_mute(xdev->xout_streams[slot], true);
                 }
                 LOG_FN_PARAMETERS("Created stream_out:%p", *stream_out);
             }
-            /* if out_create failed then 'res' has 'failed' value and it will be reported up */
         } else {
             res = -EEXIST;
             ALOGE("Output stream for this device already exists.");
@@ -424,8 +422,7 @@ int adev_open_input_stream(struct audio_hw_device *dev,
                          audio_source_t source)
 {
     int res = 0;
-    unsigned int pcm_card;
-    unsigned int pcm_device;
+    unsigned int bus_number;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
     unsigned int slot;
 
@@ -461,17 +458,21 @@ int adev_open_input_stream(struct audio_hw_device *dev,
     for (slot = 0; slot < NUMBER_OF_DEVICES_IN; slot++) {
         if ((devices & xa_input_map[slot].device_type_mask) != 0) {
             if (xa_input_map[slot].device_type_mask == AUDIO_DEVICE_IN_BUS) {
-                if (sscanf(address, "bus%u", &pcm_device) == 1) {
-                    pcm_card = xa_input_map[slot].pcm_card;
-                    pcm_device = xa_input_map[slot].pcm_device;
-                    /* device is identified, stop scanning of map */
-                    break;
+                if (sscanf(address, "bus%u", &bus_number) == 1) {
+                    if (bus_number == xa_input_map[slot].bus_number) {
+                        /* device is identified, stop scanning of map */
+                        break;
+                    } else {
+                        /* requested bus number is not equal to bus number in slot,
+                         * continue scanning */
+                    }
                 } else {
                     /* if bus address is incorrect, continue scanning of map */
+                    ALOGW("%s: 'address' has not supported format and was skipped."
+                          " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
+                          __FUNCTION__);
                 }
             } else {
-                pcm_card = xa_input_map[slot].pcm_card;
-                pcm_device = xa_input_map[slot].pcm_device;
                 /* device is identified, stop scanning of map */
                 break;
             }
@@ -480,7 +481,7 @@ int adev_open_input_stream(struct audio_hw_device *dev,
 
     if (slot < NUMBER_OF_DEVICES_IN) {
         if (xdev->xin_streams[slot] == NULL) {
-            res = in_create(dev, handle, devices, pcm_card, pcm_device, config, stream_in);
+            res = in_create(dev, handle, devices, slot, config, stream_in);
             if (*stream_in != NULL) {
                 xdev->xin_streams[slot] = (x_stream_in_t*)(*stream_in);
                 if (xdev->mic_is_muted) {
