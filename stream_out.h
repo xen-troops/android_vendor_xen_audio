@@ -59,8 +59,7 @@ typedef struct x_stream_out {
 int out_create(struct audio_hw_device *dev,
         audio_io_handle_t handle,
         audio_devices_t devices,
-        unsigned int hw_card_id,
-        unsigned int hw_device_id,
+        unsigned int slot,
         struct audio_config *config,
         struct audio_stream_out **stream_out);
 

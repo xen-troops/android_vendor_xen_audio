@@ -324,8 +324,7 @@ void in_update_sink_metadata(struct audio_stream_in *stream,
 int in_create(struct audio_hw_device *dev,
         audio_io_handle_t handle,
         audio_devices_t devices,
-        unsigned int hw_card_id,
-        unsigned int hw_device_id,
+        unsigned int slot,
         struct audio_config *config,
         struct audio_stream_in **stream_in)
 {
@@ -350,8 +349,8 @@ int in_create(struct audio_hw_device *dev,
     xin->a_dev = devices;
     xin->a_channel_mask = config->channel_mask;
     xin->a_format = config->format;
-    xin->p_card_id = hw_card_id;
-    xin->p_dev_id = hw_device_id;
+    xin->p_card_id = xa_input_map[slot].pcm_card;
+    xin->p_dev_id = xa_input_map[slot].pcm_device;
     /* following fields are cleared by calloc:
         xin->standby
         xin->muted
@@ -359,8 +358,8 @@ int in_create(struct audio_hw_device *dev,
 
     xin->p_config.channels = popcount(config->channel_mask);
     xin->p_config.rate = config->sample_rate;
-    xin->p_config.period_size = xa_config_default.period_size;
-    xin->p_config.period_count = xa_config_default.period_count;
+    xin->p_config.period_size = xa_input_map[slot].period_size;
+    xin->p_config.period_count = xa_input_map[slot].periods_per_buffer;
     xin->p_config.format = xa_config_default.format;
 
     xin->astream.common.get_sample_rate = in_get_sample_rate;
@@ -394,7 +393,7 @@ int in_create(struct audio_hw_device *dev,
     xin->frame_size = audio_stream_in_frame_size(&xin->astream);
     LOG_FN_PARAMETERS("Calculated xin->frame_size:%zu", xin->frame_size);
 
-    xin->p_handle = pcm_open(hw_card_id, hw_device_id, PCM_IN, &(xin->p_config));
+    xin->p_handle = pcm_open(xin->p_card_id, xin->p_dev_id, PCM_IN, &(xin->p_config));
     if ((xin->p_handle == NULL) || (!pcm_is_ready(xin->p_handle))) {
         error_code = errno;  /* store errno to avoid possible overwrite */
         ALOGE("%s() failed (%d). Can't open stream on device.", __FUNCTION__, error_code);

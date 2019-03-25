@@ -385,8 +385,7 @@ void out_update_source_metadata(struct audio_stream_out *stream,
 int out_create(struct audio_hw_device *dev,
         audio_io_handle_t handle,
         audio_devices_t devices,
-        unsigned int hw_card_id,
-        unsigned int hw_device_id,
+        unsigned int slot,
         struct audio_config *config,
         struct audio_stream_out **stream_out)
 {
@@ -411,8 +410,10 @@ int out_create(struct audio_hw_device *dev,
     xout->a_dev = devices;
     xout->a_channel_mask = config->channel_mask;
     xout->a_format = config->format;
-    xout->p_card_id = hw_card_id;
-    xout->p_dev_id = hw_device_id;
+    xout->p_card_id = xa_output_map[slot].pcm_card;
+    xout->p_dev_id = xa_output_map[slot].pcm_device;
+    LOG_FN_PARAMETERS("card.device:%u.%u",
+            xa_output_map[slot].pcm_card, xa_output_map[slot].pcm_device);
     /* following fields are cleared by calloc:
        xout->standby
        xout->written_frames
@@ -422,11 +423,14 @@ int out_create(struct audio_hw_device *dev,
 
     xout->p_config.channels = popcount(config->channel_mask);
     xout->p_config.rate = config->sample_rate;
-    xout->p_config.period_size = xa_config_default.period_size;
-    xout->p_config.period_count = xa_config_default.period_count;
+    xout->p_config.period_size = xa_output_map[slot].period_size;
+    xout->p_config.period_count = xa_output_map[slot].periods_per_buffer;
+    LOG_FN_PARAMETERS("size.periods:%u.%u",
+            xa_output_map[slot].period_size, xa_output_map[slot].periods_per_buffer);
     xout->p_config.format = xa_config_default.format;
     /* precalculate buffer related latency */
-    xout->buffer_latency = (xout->p_config.period_size * xout->p_config.period_count * 1000) / xout->p_config.rate;
+    xout->buffer_latency = (xout->p_config.period_size * xout->p_config.period_count * 1000)
+            / xout->p_config.rate;
     LOG_FN_PARAMETERS("Calculated buffer_latency:%d", xout->buffer_latency);
 
     xout->astream.common.get_sample_rate = out_get_sample_rate;
