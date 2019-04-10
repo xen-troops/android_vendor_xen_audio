@@ -206,7 +206,7 @@ ssize_t out_write(struct audio_stream_out *stream, const void* buffer, size_t by
        write to device
        handle errors */
     /* TODO handle non-blocking mode */
-    int ret_pcm = 0;
+    int original_errno = 0;
     x_stream_out_t *xout = (x_stream_out_t*)stream;
     useconds_t sleep_us = 0;
     size_t frames = 0;
@@ -243,19 +243,23 @@ ssize_t out_write(struct audio_stream_out *stream, const void* buffer, size_t by
         sleep_us = frames * 1000000 / xout->p_config.rate;
         usleep(sleep_us);
     } else {
-        ret_pcm = pcm_write(xout->p_handle, buffer, bytes);
+        if (pcm_write(xout->p_handle, buffer, bytes) != 0) {
+            /* pcm_write returns -1 if failed, so we need
+             * to store original errno for further reporting */
+            original_errno = errno;
+        }
         xout->written_frames += frames;
         clock_gettime(CLOCK_MONOTONIC, &xout->last_timestamp);
     }
 
     pthread_mutex_unlock(&xout->lock);
 
-    if (ret_pcm != 0) {
-        ALOGE("pcm_write() failed with %d '%s'", ret_pcm, pcm_get_error(xout->p_handle));
+    if (original_errno != 0) {
+        ALOGE("pcm_write() failed, errno:%d '%s'", -original_errno, pcm_get_error(xout->p_handle));
         /* sleep for buffer duration in us */
         sleep_us = frames * 1000000 / xout->p_config.rate;
         usleep(sleep_us);
-        return ret_pcm;
+        return -original_errno;
     }
 
     return bytes;
