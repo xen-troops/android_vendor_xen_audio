@@ -219,8 +219,9 @@ ssize_t in_read(struct audio_stream_in *stream, void* buffer, size_t bytes)
     pcm_res = pcm_read(xin->p_handle, buffer, bytes);
 
     if (pcm_res < 0) {
-        ALOGE("Read failed with %d '%s'", pcm_res, pcm_get_error(xin->p_handle));
-        ret_code = pcm_res;
+        /* depending on case pcm_read can return -errno or -1, so we have to get real errno */
+        ALOGE("pcm_read() failed, errno:%d '%s'", -errno, pcm_get_error(xin->p_handle));
+        ret_code = -errno;
     } else {
         if (xin->muted) {
             /* return clear buffer if mic is muted,
