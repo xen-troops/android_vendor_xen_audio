@@ -27,15 +27,6 @@
 #include "audio_hw_config.h"
 
 
-/* default configuration used for initialization purposes */
-const struct pcm_config xa_config_default = {
-    .channels = 2,
-    .rate = 48000,
-    .period_size = HW_PERIOD_SIZE,
-    .period_count = HW_PERIODS_PER_BUFFER,
-    .format = PCM_FORMAT_S16_LE,
-};
-
 /* map for input devices */
 xa_device_map_t xa_input_map[NUMBER_OF_DEVICES_IN] =
 {

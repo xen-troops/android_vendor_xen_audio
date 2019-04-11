@@ -36,6 +36,8 @@
  * number of output buses in audio_policy_configuration.xml */
 #define NUMBER_OF_DEVICES_OUT 8
 
+#define DEFAULT_PCM_FORMAT PCM_FORMAT_S16_LE
+
 /* This structure is used for mapping of android's audio devices to 'hardware' devices.
  * So, request for open stream on specified device is checked using this map.
  * If device type and bus number (for in/out buses) match to request then
@@ -59,9 +61,6 @@ typedef struct xa_device_map
     unsigned int periods_per_buffer;
 } xa_device_map_t;
 
-
-/* default configuration used for initialization purposes */
-extern const struct pcm_config xa_config_default;
 
 /* map for input devices */
 extern xa_device_map_t xa_input_map[NUMBER_OF_DEVICES_IN];
