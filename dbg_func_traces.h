@@ -25,11 +25,9 @@
 /* No need to check LOG_NDEBUG, because it will disable ALOGD inside logging subsystem */
 
 #if LOG_FUNC_TRACES
-#define LOG_FN_NAME()  ALOGD("%s", __FUNCTION__)
 #define LOG_FN_PARAMETERS  ALOGD
 #define LOG_FN_NAME_WITH_ARGS(format, ...)  ALOGD("%s" format, __FUNCTION__, __VA_ARGS__)
 #else  /* LOG_FUNC_TRACES */
-#define LOG_FN_NAME() (void)(0)
 #define LOG_FN_PARAMETERS(...) (void)(0)
 #define LOG_FN_NAME_WITH_ARGS(...) (void)(0)
 #endif  /* LOG_FUNC_TRACES */
