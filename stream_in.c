@@ -361,7 +361,7 @@ int in_create(struct audio_hw_device *dev,
     xin->p_config.rate = config->sample_rate;
     xin->p_config.period_size = xa_input_map[slot].period_size;
     xin->p_config.period_count = xa_input_map[slot].periods_per_buffer;
-    xin->p_config.format = xa_config_default.format;
+    xin->p_config.format = DEFAULT_PCM_FORMAT;
 
     xin->astream.common.get_sample_rate = in_get_sample_rate;
     xin->astream.common.set_sample_rate = in_set_sample_rate;

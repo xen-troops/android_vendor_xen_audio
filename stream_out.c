@@ -431,7 +431,7 @@ int out_create(struct audio_hw_device *dev,
     xout->p_config.period_count = xa_output_map[slot].periods_per_buffer;
     LOG_FN_PARAMETERS("size.periods:%u.%u",
             xa_output_map[slot].period_size, xa_output_map[slot].periods_per_buffer);
-    xout->p_config.format = xa_config_default.format;
+    xout->p_config.format = DEFAULT_PCM_FORMAT;
     /* precalculate buffer related latency */
     xout->buffer_latency = (xout->p_config.period_size * xout->p_config.period_count * 1000)
             / xout->p_config.rate;
