@@ -30,6 +30,7 @@
 #include <inttypes.h>
 /* android headers */
 #include <log/log.h>
+#include <cutils/str_parms.h>
 /* local headers*/
 #include "audio_hw_config.h"
 #include "dbg_func_traces.h"
@@ -152,14 +153,61 @@ int out_set_device(struct audio_stream *stream, audio_devices_t device)
 
 int out_set_parameters(struct audio_stream *stream, const char *kv_pairs)
 {
+    x_stream_out_t *xout = (x_stream_out_t*)stream;
+    struct str_parms * parsed_pairs;
+    char value[32];
+    char *end_ptr; /* used to confirm that numeric string was obtained */
+    long int temp;
+
     LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, kv_pairs);
 
-    /* TODO To implement */
+    pthread_mutex_lock(&xout->lock);
 
-    /* TODO recalculate frame_size if format or channels are changed */
-    /* TODO recalculate buffer latency if sample rate is changed */
-    /* TODO pause and re-route if device is changed */
+    if (!xout->standby) {
+        /* we do not change parameters during playback,
+         * so we return ENOSYS according to API */
+        pthread_mutex_unlock(&xout->lock);
+        return -ENOSYS;
+    }
 
+    parsed_pairs = str_parms_create_str(kv_pairs);
+    if (parsed_pairs == NULL) {
+        pthread_mutex_unlock(&xout->lock);
+        return -EINVAL;
+    }
+
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_ROUTING, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_ROUTING);
+        temp = strtol(value, &end_ptr, 10);
+        if ((errno == ERANGE) || (*end_ptr != '\0') || ((int)temp != temp)) {
+            pthread_mutex_unlock(&xout->lock);
+            return -EINVAL;
+        } else {
+            xout->a_dev = (int)temp;
+        }
+    }
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_FORMAT, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_FORMAT);
+        /* TODO recalculate frame_size if format or channels are changed */
+    }
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_CHANNELS, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_CHANNELS);
+        /* TODO recalculate frame_size if format or channels are changed */
+    }
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_FRAME_COUNT, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_FRAME_COUNT);
+    }
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_INPUT_SOURCE, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_INPUT_SOURCE);
+    }
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_SAMPLING_RATE, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_SAMPLING_RATE);
+        /* TODO recalculate buffer latency if sample rate is changed */
+    }
+
+    str_parms_destroy(parsed_pairs);
+
+    pthread_mutex_unlock(&xout->lock);
     return 0;
 }
 
