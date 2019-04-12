@@ -31,6 +31,7 @@
 #include <pthread.h>
 /* android headers */
 #include <log/log.h>
+#include <cutils/str_parms.h>
 #include <tinyalsa/asoundlib.h>
 /* local headers*/
 #include "audio_hw_config.h"
@@ -257,10 +258,50 @@ int adev_get_mic_mute(const struct audio_hw_device *dev, bool *state)
     return 0;
 }
 
+/* Define some strings used for setting of parameters.
+ * 'restarting=true' is hardcoded inside onAudioServerDied() in AudioService.java */
+#define DEVICE_AUDIOSERVER_RESTARTING "restarting"
+#define STRING_TRUE "true"
+
 int adev_set_parameters(struct audio_hw_device *dev, const char *kv_pairs)
 {
+    x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    struct str_parms * parsed_pairs;
+    char value[32];
+    int i;
+
     LOG_FN_NAME_WITH_ARGS("(%p, '%s')", dev, kv_pairs);
-    /* we have no special handling for now */
+
+    pthread_mutex_lock(&xdev->lock);
+
+    parsed_pairs = str_parms_create_str(kv_pairs);
+    if (parsed_pairs == NULL) {
+        pthread_mutex_unlock(&xdev->lock);
+        return 0;
+    }
+    if (str_parms_get_str(parsed_pairs, DEVICE_AUDIOSERVER_RESTARTING, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, DEVICE_AUDIOSERVER_RESTARTING);
+        if (strncmp(value, STRING_TRUE, sizeof(STRING_TRUE)) == 0) {
+            /* audioserver is restarting, so close all streams.
+             * See onAudioServerDied() in AudioService.java */
+            for (i = 0; i < NUMBER_OF_DEVICES_OUT; i++) {
+                if (xdev->xout_streams[i] != NULL) {
+                    out_destroy(xdev->xout_streams[i]);
+                    xdev->xout_streams[i] = NULL;
+                }
+            }
+            for (i = 0; i < NUMBER_OF_DEVICES_IN; i++) {
+                if (xdev->xin_streams[i] != NULL) {
+                    in_destroy(xdev->xin_streams[i]);
+                    xdev->xin_streams[i] = NULL;
+                }
+            }
+        }
+    }
+
+    str_parms_destroy(parsed_pairs);
+
+    pthread_mutex_unlock(&xdev->lock);
     return 0;
 }
 
