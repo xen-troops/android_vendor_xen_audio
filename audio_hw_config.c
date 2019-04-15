@@ -169,3 +169,46 @@ bool is_config_supported_out(const audio_config_t * config)
     return true;
 }
 
+int find_out_device(audio_devices_t devices, const char *address)
+{
+    int slot;
+    unsigned int bus_number;
+
+    if ((devices & AUDIO_DEVICE_OUT_BUS) != 0) {
+        /* We expect that address has format "bus%d_%s".
+         * In other words, we expect that bus address starts with 'bus',
+         * followed by bus number, which is followed by '_' and voluntary description.
+         * Parser in car audio service was used as reference. */
+        if (sscanf(address, "bus%u", &bus_number) == 1) {
+            /* bus number is properly recognized and stored for further comparison */
+        } else {
+            bus_number = (unsigned int)-1;
+            /* if bus address is incorrect, use not possible bus number for comparison */
+            ALOGW("%s: 'address' has not supported format and will be skipped."
+                  " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
+                  __FUNCTION__);
+        }
+    }
+
+    /* Identify PCM card and device */
+    /* We iterate through xa_output_map looking for device_type.
+     * If device type is audio bus, we check bus number also. */
+    for (slot = 0; slot < NUMBER_OF_DEVICES_OUT; slot++) {
+        if ((devices & xa_output_map[slot].device_type_mask) != 0) {
+            if (xa_output_map[slot].device_type_mask == AUDIO_DEVICE_OUT_BUS) {
+                if (bus_number == xa_output_map[slot].bus_number) {
+                    /* device is identified, stop scanning of map */
+                    break;
+                }
+            } else {
+                /* device is identified, stop scanning of map */
+                break;
+            }
+        }
+    }
+
+    if (slot >=  NUMBER_OF_DEVICES_OUT) {
+        slot = -1;
+    }
+    return slot;
+}

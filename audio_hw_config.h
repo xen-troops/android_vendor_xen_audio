@@ -74,4 +74,9 @@ bool is_config_supported_in(const audio_config_t * config);
 /* return true if config is supported for output stream */
 bool is_config_supported_out(const audio_config_t * config);
 
+/* find appropriate slot for specified device in xa_output_map
+ * devices - can be bitmask
+ * address - parsed only for AUDIO_DEVICE_OUT_BUS, expected format 'bus0_media' */
+int find_out_device(audio_devices_t devices, const char *address);
+
 #endif /* VENDOR_XEN_AUDIO_AUDIO_HW_CONFIG_H_ */

@@ -345,9 +345,8 @@ int adev_open_output_stream(struct audio_hw_device *dev,
                           const char *address)
 {
     int res = 0;
-    unsigned int bus_number;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
-    unsigned int slot;
+    int slot;
 
     LOG_FN_NAME_WITH_ARGS(
             "(%p, handle:%d, devices:%s(0x%x), flags:%s(0x%x), "
@@ -357,8 +356,6 @@ int adev_open_output_stream(struct audio_hw_device *dev,
             address);
 
     pthread_mutex_lock(&xdev->lock);
-
-    /* is requested configuration supported? */
 
     /* check input parameters*/
     if (!is_config_supported_out(config)) {
@@ -375,38 +372,8 @@ int adev_open_output_stream(struct audio_hw_device *dev,
         return -EINVAL;
     }
 
-    /* Identify PCM card and device */
-    /* We iterate through xa_output_map looking for device_type.
-     * If device type is audio bus, we check bus number also. */
-    for (slot = 0; slot < NUMBER_OF_DEVICES_OUT; slot++) {
-        if ((devices & xa_output_map[slot].device_type_mask) != 0) {
-            if (xa_output_map[slot].device_type_mask == AUDIO_DEVICE_OUT_BUS) {
-                /* We expect that address has format "bus%d_%s".
-                 * In other words, we expect that bus address starts with 'bus',
-                 * followed by bus number, which is followed by '_' and voluntary description.
-                 * Parser in car audio service was used as reference. */
-                if (sscanf(address, "bus%u", &bus_number) == 1) {
-                    if (bus_number == xa_output_map[slot].bus_number) {
-                        /* device is identified, stop scanning of map */
-                        break;
-                    } else {
-                        /* requested bus number is not equal to bus number in slot,
-                         * continue scanning */
-                    }
-                } else {
-                    /* if bus address is incorrect, continue scanning of map */
-                    ALOGW("%s: 'address' has not supported format and was skipped."
-                          " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
-                          __FUNCTION__);
-                }
-            } else {
-                /* device is identified, stop scanning of map */
-                break;
-            }
-        }
-    }
-
-    if (slot < NUMBER_OF_DEVICES_OUT) {
+    slot = find_out_device(devices, address);
+    if (slot >= 0) {
         if (xdev->xout_streams[slot] == NULL) {
             /* create new stream on free device */
             res = out_create(dev, handle, devices, slot, config, stream_out);
