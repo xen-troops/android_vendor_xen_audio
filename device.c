@@ -709,3 +709,15 @@ int adev_set_audio_port_config(struct audio_hw_device *dev, const struct audio_p
 
     return 0;
 }
+
+/* functions for internal purposes */
+
+int adev_is_slot_free(struct audio_hw_device *dev, int slot)
+{
+    x_audio_device_t *xdev = (x_audio_device_t*)dev;
+
+    if (xdev == NULL) {
+        return 0;
+    }
+    return (xdev->xout_streams[slot] == NULL) ? 1 : 0;
+}

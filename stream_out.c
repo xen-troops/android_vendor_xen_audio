@@ -35,6 +35,7 @@
 #include "audio_hw_config.h"
 #include "dbg_func_traces.h"
 #include "stream_out.h"
+#include "device.h"
 
 
 uint32_t out_get_sample_rate(const struct audio_stream *stream)
@@ -158,6 +159,7 @@ int out_set_parameters(struct audio_stream *stream, const char *kv_pairs)
     char value[32];
     char *end_ptr; /* used to confirm that numeric string was obtained */
     long int temp;
+    int slot;
 
     LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, kv_pairs);
 
@@ -180,10 +182,30 @@ int out_set_parameters(struct audio_stream *stream, const char *kv_pairs)
         str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_ROUTING);
         temp = strtol(value, &end_ptr, 10);
         if ((errno == ERANGE) || (*end_ptr != '\0') || ((int)temp != temp)) {
+            str_parms_destroy(parsed_pairs);
             pthread_mutex_unlock(&xout->lock);
             return -EINVAL;
+        }
+
+        /* find corresponding pcm_card/pcm_devive */
+        slot = find_out_device(temp, NULL);
+        if (slot >= 0) {
+            /* TODO implement check for free slot in xdev */
+            if (adev_is_slot_free(xout->dev, slot)) {
+                xout->a_dev = (int)temp;
+                xout->p_card_id = xa_output_map[slot].pcm_card;
+                xout->p_dev_id = xa_output_map[slot].pcm_device;
+            } else {
+                ALOGE("Output stream for this device already exists.");
+                str_parms_destroy(parsed_pairs);
+                pthread_mutex_unlock(&xout->lock);
+                return -EEXIST;
+            }
         } else {
-            xout->a_dev = (int)temp;
+            ALOGE("Can't create output stream. Corresponding device was not found.");
+            str_parms_destroy(parsed_pairs);
+            pthread_mutex_unlock(&xout->lock);
+            return -EINVAL;
         }
     }
     if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_FORMAT, value, sizeof(value)) >= 0) {
@@ -459,6 +481,7 @@ int out_create(struct audio_hw_device *dev,
 
     /* setup stream structure */
     pthread_mutex_init(&xout->lock, NULL);
+    xout->dev = dev;
     xout->a_dev = devices;
     xout->a_channel_mask = config->channel_mask;
     xout->a_format = config->format;

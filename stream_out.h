@@ -42,6 +42,7 @@ typedef struct x_stream_out {
     audio_format_t a_format;
 
     /* internal variables */
+    struct audio_hw_device * dev;
     bool standby;
     uint64_t written_frames;
     struct timespec last_timestamp;

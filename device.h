@@ -22,6 +22,8 @@
 
 #include <hardware/audio.h>
 
+/* functions required by audio_hw_device API */
+
 int adev_open(const hw_module_t* module, const char* name, hw_device_t** device);
 int adev_close(hw_device_t *device);
 uint32_t adev_get_supported_devices(const struct audio_hw_device *dev);
@@ -68,5 +70,9 @@ int adev_create_audio_patch(struct audio_hw_device *dev,
 int adev_release_audio_patch(struct audio_hw_device *dev, audio_patch_handle_t handle);
 int adev_get_audio_port(struct audio_hw_device *dev, struct audio_port *port);
 int adev_set_audio_port_config(struct audio_hw_device *dev, const struct audio_port_config *config);
+
+/* functions for internal purposes */
+
+int adev_is_slot_free(struct audio_hw_device *adev, int slot);
 
 #endif /* VENDOR_XEN_AUDIO_DEVICE_H_ */
