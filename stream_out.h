@@ -49,6 +49,7 @@ typedef struct x_stream_out {
     size_t frame_size;
     uint32_t buffer_latency;
     bool muted;
+    int error_cntr;
 } x_stream_out_t;
 
 /**
