@@ -267,6 +267,11 @@ int out_set_volume(struct audio_stream_out *stream, float left, float right)
     return -ENOSYS;
 }
 
+/* Max number of errors allowed during stream output
+ * see also error_cntr variable in x_stream_out struct.
+ * Counter is reset on successful write to pcm device. */
+#define MAX_ALLOWED_ERRORS 5
+
 ssize_t out_write(struct audio_stream_out *stream, const void* buffer, size_t bytes)
 {
     /* check parameters
@@ -326,10 +331,17 @@ ssize_t out_write(struct audio_stream_out *stream, const void* buffer, size_t by
 
     if (original_errno != 0) {
         ALOGE("pcm_write() failed, errno:%d '%s'", -original_errno, pcm_get_error(xout->p_handle));
+        xout->error_cntr++;
+        if (xout->error_cntr >= MAX_ALLOWED_ERRORS) {
+            /* too much errors occurred - stop stream */
+            out_standby((struct audio_stream *)stream);
+        }
         /* sleep for buffer duration in us */
         sleep_us = frames * 1000000 / xout->p_config.rate;
         usleep(sleep_us);
         return -original_errno;
+    } else {
+        xout->error_cntr = 0;
     }
 
     return bytes;
@@ -494,6 +506,7 @@ int out_create(struct audio_hw_device *dev,
        xout->written_frames
        xout->last_timestamp
        xout->muted
+       xout->error_cntr
     */
 
     xout->p_config.channels = popcount(config->channel_mask);
