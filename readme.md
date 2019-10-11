@@ -1,5 +1,4 @@
 # android_vendor_xen_audio
-
 Android's Audio HAL module for Xen virtual machine
 
 ## Summary
