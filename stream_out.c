@@ -28,6 +28,8 @@
 /* standard headers */
 #include <stdlib.h>
 #include <inttypes.h>
+#include <pthread.h>
+#include <unistd.h>
 /* android headers */
 #include <log/log.h>
 #include <cutils/str_parms.h>
