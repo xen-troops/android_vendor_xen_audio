@@ -51,19 +51,19 @@ xa_device_map_t xa_output_map[NUMBER_OF_DEVICES_OUT] =
     /* media */
     {AUDIO_DEVICE_OUT_BUS, 0, 0, 0, 2048, 4},
     /* navigation */
-    {AUDIO_DEVICE_OUT_BUS, 1, 0, 1,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 1, 0, 1, 1024, 2},
     /* voice command */
-    {AUDIO_DEVICE_OUT_BUS, 2, 0, 2,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 2, 0, 2, 1024, 2},
     /* call ring */
-    {AUDIO_DEVICE_OUT_BUS, 3, 0, 3,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 3, 0, 3, 1024, 2},
     /* call */
-    {AUDIO_DEVICE_OUT_BUS, 4, 0, 4,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 4, 0, 4, 1024, 2},
     /* alarm */
-    {AUDIO_DEVICE_OUT_BUS, 5, 0, 5,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 5, 0, 5, 1024, 2},
     /* notification */
-    {AUDIO_DEVICE_OUT_BUS, 6, 0, 6,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 6, 0, 6, 1024, 2},
     /* system sound */
-    {AUDIO_DEVICE_OUT_BUS, 7, 0, 7,  512, 2},
+    {AUDIO_DEVICE_OUT_BUS, 7, 0, 7, 1024, 2},
 };
 
 const unsigned int xa_supported_channels_out[] = {2};
