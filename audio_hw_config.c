@@ -66,10 +66,10 @@ xa_device_map_t xa_output_map[NUMBER_OF_DEVICES_OUT] =
     {AUDIO_DEVICE_OUT_BUS, 7, 0, 7, 1024, 2},
 };
 
-const unsigned int xa_supported_channels_out[] = {2};
+const unsigned int xa_supported_channels_out[] = {1, 2};
 const unsigned int xa_supported_channels_in[] = {1, 2};
 /* sample rates */
-const unsigned int xa_supported_rates_out[] = {48000};
+const unsigned int xa_supported_rates_out[] = {8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000};
 const unsigned int xa_supported_rates_in[] = {8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000};
 /* android-side formats */
 const unsigned int xa_supported_aformats[] = {AUDIO_FORMAT_PCM_16_BIT};
