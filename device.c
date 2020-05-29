@@ -430,7 +430,6 @@ int adev_open_input_stream(struct audio_hw_device *dev,
                          audio_source_t source)
 {
     int res = 0;
-    unsigned int bus_number;
     x_audio_device_t *xdev = (x_audio_device_t*)dev;
     unsigned int slot;
 
@@ -462,48 +461,25 @@ int adev_open_input_stream(struct audio_hw_device *dev,
         return -EINVAL;
     }
 
-    /* Identify pcm device */
-    for (slot = 0; slot < NUMBER_OF_DEVICES_IN; slot++) {
-        if ((devices & xa_input_map[slot].device_type_mask) != 0) {
-            if (xa_input_map[slot].device_type_mask == AUDIO_DEVICE_IN_BUS) {
-                if (sscanf(address, "bus%u", &bus_number) == 1) {
-                    if (bus_number == xa_input_map[slot].bus_number) {
-                        /* device is identified, stop scanning of map */
-                        break;
-                    } else {
-                        /* requested bus number is not equal to bus number in slot,
-                         * continue scanning */
-                    }
-                } else {
-                    /* if bus address is incorrect, continue scanning of map */
-                    ALOGW("%s: 'address' has not supported format and was skipped."
-                          " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
-                          __FUNCTION__);
-                }
-            } else {
-                /* device is identified, stop scanning of map */
-                break;
-            }
-        }
-    }
-
-    if (slot < NUMBER_OF_DEVICES_IN) {
+    slot = find_in_device(devices, address);
+    if (slot >= 0) {
         if (xdev->xin_streams[slot] == NULL) {
+            /* create new stream on free device */
             res = in_create(dev, handle, devices, slot, config, stream_in);
             if (*stream_in != NULL) {
                 xdev->xin_streams[slot] = (x_stream_in_t*)(*stream_in);
                 if (xdev->mic_is_muted) {
                     in_set_mute(xdev->xin_streams[slot], true);
                 }
+                LOG_FN_PARAMETERS("Created stream_in:%p", *stream_in);
             }
-            LOG_FN_PARAMETERS("Created stream_in:%p", *stream_in);
         } else {
             res = -EEXIST;
             ALOGE("Input stream for this device already exists.");
         }
     } else {
         res = -EINVAL;
-        ALOGE("Can't create input stream on incorrect device.");
+        ALOGE("Can't create input stream. Corresponding device was not found.");
     }
 
     pthread_mutex_unlock(&xdev->lock);
