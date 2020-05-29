@@ -182,11 +182,11 @@ int find_out_device(audio_devices_t devices, const char *address)
         if (sscanf(address, "bus%u", &bus_number) == 1) {
             /* bus number is properly recognized and stored for further comparison */
         } else {
-            bus_number = (unsigned int)-1;
-            /* if bus address is incorrect, use not possible bus number for comparison */
+            /* bus address is incorrect, we can't find device */
             ALOGW("%s: 'address' has not supported format and will be skipped."
                   " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
                   __FUNCTION__);
+            return -1;
         }
     }
 
@@ -206,7 +206,6 @@ int find_out_device(audio_devices_t devices, const char *address)
             }
         }
     }
-
     if (slot >=  NUMBER_OF_DEVICES_OUT) {
         slot = -1;
     }
@@ -224,13 +223,13 @@ int find_in_device(audio_devices_t devices, const char *address)
          * followed by bus number, which is followed by '_' and voluntary description.
          * Parser in car audio service was used as reference. */
         if (sscanf(address, "bus%u", &bus_number) == 1) {
-            /* bus number is properly recognized and stored for further comparison */
+            /* bus number is properly recognized */
         } else {
-            bus_number = (unsigned int)-1;
-            /* if bus address is incorrect, use not possible bus number for comparison */
+            /* bus address is incorrect, we can't find device */
             ALOGW("%s: 'address' has not supported format and will be skipped."
                   " Expected: 'bus%%d_%%s': 'bus' word, bus number, '_', description.",
                   __FUNCTION__);
+            return -1;
         }
     }
 
@@ -250,7 +249,6 @@ int find_in_device(audio_devices_t devices, const char *address)
             }
         }
     }
-
     if (slot >=  NUMBER_OF_DEVICES_IN) {
         slot = -1;
     }
