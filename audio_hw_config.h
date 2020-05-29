@@ -79,4 +79,9 @@ bool is_config_supported_out(const audio_config_t * config);
  * address - parsed only for AUDIO_DEVICE_OUT_BUS, expected format 'bus0_media' */
 int find_out_device(audio_devices_t devices, const char *address);
 
+/* find appropriate slot for specified device in xa_input_map
+ * devices - can be bitmask
+ * address - parsed only for AUDIO_DEVICE_IN_BUS, expected format 'bus0_in' */
+int find_in_device(audio_devices_t devices, const char *address);
+
 #endif /* VENDOR_XEN_AUDIO_AUDIO_HW_CONFIG_H_ */
