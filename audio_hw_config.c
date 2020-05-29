@@ -190,6 +190,11 @@ int find_out_device(audio_devices_t devices, const char *address)
         }
     }
 
+    if ((devices & AUDIO_DEVICE_OUT_DEFAULT) != 0) {
+        /* We consider first device as default */
+        return 0;
+    }
+
     /* Identify PCM card and device */
     /* We iterate through xa_output_map looking for device_type.
      * If device type is audio bus, we check bus number also. */
@@ -231,6 +236,11 @@ int find_in_device(audio_devices_t devices, const char *address)
                   __FUNCTION__);
             return -1;
         }
+    }
+
+    if ((devices & AUDIO_DEVICE_IN_DEFAULT) != 0) {
+        /* We consider first device as default */
+        return 0;
     }
 
     /* Identify PCM card and device */
