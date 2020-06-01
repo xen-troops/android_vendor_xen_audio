@@ -174,7 +174,7 @@ int find_out_device(audio_devices_t devices, const char *address)
     int slot;
     unsigned int bus_number;
 
-    if ((devices & AUDIO_DEVICE_OUT_BUS) != 0) {
+    if ((devices & AUDIO_DEVICE_OUT_BUS) == AUDIO_DEVICE_OUT_BUS) {
         /* We expect that address has format "bus%d_%s".
          * In other words, we expect that bus address starts with 'bus',
          * followed by bus number, which is followed by '_' and voluntary description.
@@ -190,7 +190,7 @@ int find_out_device(audio_devices_t devices, const char *address)
         }
     }
 
-    if ((devices & AUDIO_DEVICE_OUT_DEFAULT) != 0) {
+    if ((devices & AUDIO_DEVICE_OUT_DEFAULT) == AUDIO_DEVICE_OUT_DEFAULT) {
         /* We consider first device as default */
         return 0;
     }
@@ -199,7 +199,7 @@ int find_out_device(audio_devices_t devices, const char *address)
     /* We iterate through xa_output_map looking for device_type.
      * If device type is audio bus, we check bus number also. */
     for (slot = 0; slot < NUMBER_OF_DEVICES_OUT; slot++) {
-        if ((devices & xa_output_map[slot].device_type_mask) != 0) {
+        if ((devices & xa_output_map[slot].device_type_mask) == xa_output_map[slot].device_type_mask) {
             if (xa_output_map[slot].device_type_mask == AUDIO_DEVICE_OUT_BUS) {
                 if (bus_number == xa_output_map[slot].bus_number) {
                     /* device is identified, stop scanning of map */
@@ -222,7 +222,7 @@ int find_in_device(audio_devices_t devices, const char *address)
     int slot;
     unsigned int bus_number;
 
-    if ((devices & AUDIO_DEVICE_IN_BUS) != 0) {
+    if ((devices & AUDIO_DEVICE_IN_BUS) == AUDIO_DEVICE_IN_BUS) {
         /* We expect that address has format "bus%d_%s".
          * In other words, we expect that bus address starts with 'bus',
          * followed by bus number, which is followed by '_' and voluntary description.
@@ -238,7 +238,7 @@ int find_in_device(audio_devices_t devices, const char *address)
         }
     }
 
-    if ((devices & AUDIO_DEVICE_IN_DEFAULT) != 0) {
+    if ((devices & AUDIO_DEVICE_IN_DEFAULT) == AUDIO_DEVICE_IN_DEFAULT) {
         /* We consider first device as default */
         return 0;
     }
@@ -247,7 +247,7 @@ int find_in_device(audio_devices_t devices, const char *address)
     /* We iterate through xa_input_map looking for device_type.
      * If device type is audio bus, we check bus number also. */
     for (slot = 0; slot < NUMBER_OF_DEVICES_IN; slot++) {
-        if ((devices & xa_input_map[slot].device_type_mask) != 0) {
+        if ((devices & xa_input_map[slot].device_type_mask) == xa_input_map[slot].device_type_mask) {
             if (xa_input_map[slot].device_type_mask == AUDIO_DEVICE_IN_BUS) {
                 if (bus_number == xa_input_map[slot].bus_number) {
                     /* device is identified, stop scanning of map */
