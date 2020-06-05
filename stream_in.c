@@ -31,6 +31,7 @@
 #include <pthread.h>
 /* android headers */
 #include <log/log.h>
+#include <cutils/str_parms.h>
 /* local headers*/
 #include "audio_hw_config.h"
 #include "dbg_func_traces.h"
@@ -160,9 +161,61 @@ int in_set_parameters(struct audio_stream *stream, const char *kv_pairs)
 
 char * in_get_parameters(const struct audio_stream *stream, const char *keys)
 {
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+    struct str_parms * request_keys;
+    struct str_parms * response_pairs;
+    char temp_str[256];
+    bool have_response = false;
+    char *result_str = NULL;
+
+    pthread_mutex_lock(&xin->lock);
     LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, keys);
-    /* TODO To implement */
-    return strdup("");
+
+    request_keys = str_parms_create_str(keys);
+    if (request_keys == NULL) {
+        pthread_mutex_unlock(&xin->lock);
+        return strdup("");
+    }
+
+    response_pairs = str_parms_create();
+    if (response_pairs == NULL) {
+        pthread_mutex_unlock(&xin->lock);
+        return strdup("");
+    }
+
+    if (str_parms_has_key(request_keys, AUDIO_PARAMETER_STREAM_SUP_FORMATS)) {
+        if (0 == str_parms_add_str(response_pairs,
+                                   AUDIO_PARAMETER_STREAM_SUP_FORMATS,
+                                   "AUDIO_FORMAT_PCM_16_BIT")) {
+            /* we have no possibility to return error code,
+               so just do not return incorrect string */
+            have_response = true;
+        }
+    }
+
+    if (str_parms_has_key(request_keys, AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES)) {
+        temp_str[0] = 0;
+        get_supported_in_rates_as_string((char*)&temp_str, sizeof(temp_str));
+        LOG_FN_PARAMETERS("get_supported_in_rates_as_string %s", temp_str);
+        if (0 == str_parms_add_str(response_pairs,
+                                   AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES,
+                                   temp_str)) {
+            /* we have no possibility to return error code,
+               so just do not return incorrect string */
+            have_response = true;
+        }
+    }
+
+    if (have_response) {
+        result_str = str_parms_to_str(response_pairs);
+    }
+
+    str_parms_destroy(request_keys);
+    str_parms_destroy(response_pairs);
+
+    pthread_mutex_unlock(&xin->lock);
+
+    return result_str;
 }
 
 int in_add_audio_effect(const struct audio_stream *stream, effect_handle_t effect)
