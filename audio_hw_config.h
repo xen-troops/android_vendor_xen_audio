@@ -68,6 +68,12 @@ extern xa_device_map_t xa_input_map[NUMBER_OF_DEVICES_IN];
 /* map for output devices */
 extern xa_device_map_t xa_output_map[NUMBER_OF_DEVICES_OUT];
 
+/* print string presentation of supported sample rates for input stream */
+void get_supported_in_rates_as_string(char * pbuf, size_t buf_size);
+
+/* print string presentation of supported sample rates for output stream */
+void get_supported_out_rates_as_string(char * pbuf, size_t buf_size);
+
 /* return true if config is supported for input stream */
 bool is_config_supported_in(const audio_config_t * config);
 

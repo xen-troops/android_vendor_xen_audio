@@ -237,9 +237,59 @@ int out_set_parameters(struct audio_stream *stream, const char *kv_pairs)
 
 char * out_get_parameters(const struct audio_stream *stream, const char *keys)
 {
+    x_stream_out_t *xout = (x_stream_out_t*)stream;
+    struct str_parms * request_keys;
+    struct str_parms * response_pairs;
+    char temp_str[256];
+    bool have_response = false;
+    char *result_str = NULL;
+
+    pthread_mutex_lock(&xout->lock);
     LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, keys);
-    /* TODO To implement */
-    return strdup("");
+
+    request_keys = str_parms_create_str(keys);
+    if (request_keys == NULL) {
+        pthread_mutex_unlock(&xout->lock);
+        return strdup("");
+    }
+
+    response_pairs = str_parms_create();
+    if (response_pairs == NULL) {
+        pthread_mutex_unlock(&xout->lock);
+        return strdup("");
+    }
+
+    if (str_parms_has_key(request_keys, AUDIO_PARAMETER_STREAM_SUP_FORMATS)) {
+        if (0 == str_parms_add_str(response_pairs,
+                          AUDIO_PARAMETER_STREAM_SUP_FORMATS,
+                          "AUDIO_FORMAT_PCM_16_BIT")) {
+            /* we have no possibility to return error code,
+               so just do not return incorrect string */
+            have_response = true;
+        }
+    }
+
+    if (str_parms_has_key(request_keys, AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES)) {
+        temp_str[0] = 0;
+        get_supported_out_rates_as_string((char*)&temp_str, sizeof(temp_str));
+        LOG_FN_PARAMETERS("get_supported_out_rates_as_string %s", temp_str);
+        if (0 == str_parms_add_str(response_pairs,
+                                   AUDIO_PARAMETER_STREAM_SUP_SAMPLING_RATES,
+                                   temp_str)) {
+            have_response = true;
+        }
+    }
+
+    if (have_response) {
+        result_str = str_parms_to_str(response_pairs);
+    }
+
+    str_parms_destroy(request_keys);
+    str_parms_destroy(response_pairs);
+
+    pthread_mutex_unlock(&xout->lock);
+
+    return result_str;
 }
 
 int out_add_audio_effect(const struct audio_stream *stream, effect_handle_t effect)

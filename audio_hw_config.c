@@ -74,6 +74,37 @@ const unsigned int xa_supported_rates_in[] = {8000, 11025, 12000, 16000, 22050, 
 /* android-side formats */
 const unsigned int xa_supported_aformats[] = {AUDIO_FORMAT_PCM_16_BIT};
 
+void get_supported_in_rates_as_string(char * pbuf, size_t buf_size)
+{
+    int i;
+    char temp[10];
+    for (i = 0; i < sizeof(xa_supported_rates_in)/sizeof(xa_supported_rates_in[0]); i++) {
+        sprintf(temp, "%d|", xa_supported_rates_in[i]);
+        if ((strlen(pbuf) + strlen(temp) + 1) < buf_size) {
+            strcat(pbuf, temp);
+        }
+    }
+    if (strlen(pbuf) > 0) {
+        /* remove last '|' */
+        pbuf[strlen(pbuf)-1] = 0;
+    }
+}
+
+void get_supported_out_rates_as_string(char * pbuf, size_t buf_size)
+{
+    int i;
+    char temp[10];
+    for (i = 0; i < sizeof(xa_supported_rates_out)/sizeof(xa_supported_rates_out[0]); i++) {
+        sprintf(temp, "%d|", xa_supported_rates_out[i]);
+        if ((strlen(pbuf) + strlen(temp) + 1) < buf_size) {
+            strcat(pbuf, temp);
+        }
+    }
+    if (strlen(pbuf) > 0) {
+        /* remove last '|' */
+        pbuf[strlen(pbuf)-1] = 0;
+    }
+}
 
 /* check that parameters are supported for input stream */
 bool is_config_supported_in(const audio_config_t * config)
