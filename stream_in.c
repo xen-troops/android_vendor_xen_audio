@@ -342,7 +342,7 @@ int in_create_mmap_buffer(const struct audio_stream_in *stream,
 {
     LOG_FN_NAME_WITH_ARGS("(%p)", stream);
     /* MMAP is not supported for now */
-    return -ENODEV;
+    return -ENOSYS;
 }
 
 int in_get_mmap_position(const struct audio_stream_in *stream,
@@ -350,7 +350,7 @@ int in_get_mmap_position(const struct audio_stream_in *stream,
 {
     LOG_FN_NAME_WITH_ARGS("(%p)", stream);
     /* MMAP is not supported for now */
-    return -ENODATA;
+    return -ENOSYS;
 }
 
 int in_get_active_microphones(const struct audio_stream_in *stream,
