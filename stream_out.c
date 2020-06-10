@@ -167,6 +167,12 @@ int out_set_parameters(struct audio_stream *stream, const char *kv_pairs)
 
     pthread_mutex_lock(&xout->lock);
 
+    if (kv_pairs[0] == '\0') {
+        /* it's OK to receive empty string */
+        pthread_mutex_unlock(&xout->lock);
+        return 0;
+    }
+
     if (!xout->standby) {
         /* we do not change parameters during playback,
          * so we return ENOSYS according to API */
