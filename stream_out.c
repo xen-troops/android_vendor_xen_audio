@@ -426,34 +426,6 @@ int out_set_callback(struct audio_stream_out *stream, stream_callback_t callback
     return -ENOSYS;
 }
 
-int out_pause(struct audio_stream_out* stream)
-{
-    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
-    /* Applicable only for offloaded (DSP) playback. Not supported on current configuration. */
-    return -ENOSYS;
-}
-
-int out_resume(struct audio_stream_out* stream)
-{
-    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
-    /* Applicable only for offloaded (DSP) playback. Not supported on current configuration. */
-    return -ENOSYS;
-}
-
-int out_drain(struct audio_stream_out* stream, audio_drain_type_t type )
-{
-    LOG_FN_NAME_WITH_ARGS("(%p, type:%d)", stream, type);
-    /* Applicable only for offloaded (DSP) playback. Not supported on current configuration. */
-    return -ENOSYS;
-}
-
-int out_flush(struct audio_stream_out* stream)
-{
-    LOG_FN_NAME_WITH_ARGS("(%p)", stream);
-    /* Applicable only for offloaded (DSP) playback. Not supported on current configuration. */
-    return -ENOSYS;
-}
-
 int out_get_presentation_position(const struct audio_stream_out *stream,
                            uint64_t *frames, struct timespec *timestamp)
 {
@@ -600,10 +572,17 @@ int out_create(struct audio_hw_device *dev,
     xout->astream.get_render_position = out_get_render_position;
     xout->astream.get_next_write_timestamp = out_get_next_write_timestamp;
     xout->astream.set_callback = out_set_callback;
-    xout->astream.pause = out_pause;
-    xout->astream.resume = out_resume;
-    xout->astream.drain = out_drain;
-    xout->astream.flush = out_flush;
+    /* If we do not support pause/resume and drain functionality then
+       we need to have NULL in corresponding fields
+       instead of return ENOSYS in function.
+
+       There are functions supportsPauseAndResume() and supportsDrain()
+       in upper level that check corresponding fields for NULL
+       to determine are functions supported. */
+    xout->astream.pause = NULL; /* must be NULL if not supported */
+    xout->astream.resume = NULL; /* must be NULL if not supported */
+    xout->astream.drain = NULL; /* must be NULL if not supported */
+    xout->astream.flush = NULL; /* set to NULL as optional function depending on pause */
     xout->astream.get_presentation_position = out_get_presentation_position;
     xout->astream.start = out_start;
     xout->astream.stop = out_stop;
