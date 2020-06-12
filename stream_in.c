@@ -154,8 +154,51 @@ int in_set_device(struct audio_stream *stream, audio_devices_t device)
 
 int in_set_parameters(struct audio_stream *stream, const char *kv_pairs)
 {
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+    struct str_parms * parsed_pairs;
+    char value[32];
+    char *end_ptr; /* used to confirm that numeric string was obtained */
+    long int temp;
+
     LOG_FN_NAME_WITH_ARGS("(%p, '%s')", stream, kv_pairs);
-    /* TODO To implement */
+
+    pthread_mutex_lock(&xin->lock);
+
+    if (kv_pairs[0] == '\0') {
+        /* it's OK to receive empty string */
+        pthread_mutex_unlock(&xin->lock);
+        return 0;
+    }
+
+    if (!xin->standby) {
+        /* we do not change parameters during record,
+         * so we return ENOSYS according to API */
+        pthread_mutex_unlock(&xin->lock);
+        return -ENOSYS;
+    }
+
+    parsed_pairs = str_parms_create_str(kv_pairs);
+    if (parsed_pairs == NULL) {
+        pthread_mutex_unlock(&xin->lock);
+        return -EINVAL;
+    }
+
+    if (str_parms_get_str(parsed_pairs, AUDIO_PARAMETER_STREAM_SAMPLING_RATE, value, sizeof(value)) >= 0) {
+        str_parms_del(parsed_pairs, AUDIO_PARAMETER_STREAM_SAMPLING_RATE);
+        temp = strtol(value, &end_ptr, 10);
+        if ((errno == ERANGE) || (*end_ptr != '\0') || ((int)temp != temp)) {
+            str_parms_destroy(parsed_pairs);
+            pthread_mutex_unlock(&xin->lock);
+            return -EINVAL;
+        }
+        /* At this point stream is in standby mode, so we can change parameters,
+           and they will be used during next re-open of stream by in_read() */
+        xin->p_config.rate = temp;
+    }
+
+    str_parms_destroy(parsed_pairs);
+
+    pthread_mutex_unlock(&xin->lock);
     return 0;
 }
 
