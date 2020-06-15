@@ -400,9 +400,48 @@ int in_get_active_microphones(const struct audio_stream_in *stream,
                               struct audio_microphone_characteristic_t *mic_array,
                               size_t *mic_count)
 {
+    x_stream_in_t *xin = (x_stream_in_t*)stream;
+
+    if ((xin == NULL) || (mic_array == NULL) || (mic_count == NULL)) {
+        return -EINVAL;
+    }
+
+    pthread_mutex_lock(&xin->lock);
     LOG_FN_NAME_WITH_ARGS("(%p)", stream);
-    /* TODO To implement */
-    return -ENOSYS;
+
+    /* this functon is called only on active stream,
+       so  we always have just one mic active */
+    *mic_count = 1;
+    memset(&(mic_array[0]), 0, sizeof(mic_array[0]));
+    /*
+    mic_array[0].device_id[AUDIO_MICROPHONE_ID_MAX_LEN] = 0;
+    mic_array[0].id = 0;
+    */
+    mic_array[0].device = xin->a_dev;
+    strncpy(mic_array[0].address,
+            AUDIO_BOTTOM_MICROPHONE_ADDRESS,
+            AUDIO_DEVICE_MAX_ADDRESS_LEN - 1);
+    memset(mic_array[0].channel_mapping,
+           AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED,
+           AUDIO_CHANNEL_COUNT_MAX);
+    mic_array[0].location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
+    mic_array[0].group              = 0;
+    mic_array[0].index_in_the_group = 0;
+    mic_array[0].sensitivity    = AUDIO_MICROPHONE_SENSITIVITY_UNKNOWN;
+    mic_array[0].max_spl        = AUDIO_MICROPHONE_SPL_UNKNOWN;
+    mic_array[0].min_spl        = AUDIO_MICROPHONE_SPL_UNKNOWN;
+    mic_array[0].directionality = AUDIO_MICROPHONE_DIRECTIONALITY_UNKNOWN;
+    mic_array[0].num_frequency_responses = 0;
+    /* num_frequency_responses is 0 so no need to set frequency_responses[] */
+    mic_array[0].geometric_location.x = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+    mic_array[0].geometric_location.y = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+    mic_array[0].geometric_location.z = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+    mic_array[0].orientation.x        = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+    mic_array[0].orientation.y        = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+    mic_array[0].orientation.z        = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+
+    pthread_mutex_unlock(&xin->lock);
+    return 0;
 }
 
 void in_update_sink_metadata(struct audio_stream_in *stream,

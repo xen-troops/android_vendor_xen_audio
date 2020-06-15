@@ -513,9 +513,50 @@ int adev_get_microphones(const struct audio_hw_device *dev,
                        struct audio_microphone_characteristic_t *mic_array,
                        size_t *mic_count)
 {
+    x_audio_device_t *xdev = (x_audio_device_t*)dev;
+    unsigned int i;
+
+    if ((xdev == NULL) || (mic_array == NULL) || (mic_count == NULL)) {
+        return -EINVAL;
+    }
+
+    pthread_mutex_lock(&xdev->lock);
     LOG_FN_NAME_WITH_ARGS("(%p)", dev);
-    /* TODO To implement */
-    return -ENOSYS;
+
+    *mic_count = NUMBER_OF_DEVICES_IN;
+    for (i = 0; i < NUMBER_OF_DEVICES_IN; i++) {
+        memset(&(mic_array[i]), 0, sizeof(mic_array[0]));
+        /*
+        TODO: do we need to store device_id in xa_input_map ?
+        mic_array[i].device_id[AUDIO_MICROPHONE_ID_MAX_LEN] = 0;
+        mic_array[i].id = 0;
+        */
+        mic_array[i].device = xa_input_map[i].device_type_mask;
+        strncpy(mic_array[i].address,
+                AUDIO_BOTTOM_MICROPHONE_ADDRESS,
+                AUDIO_DEVICE_MAX_ADDRESS_LEN - 1);
+        memset(mic_array[i].channel_mapping,
+               AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED,
+               AUDIO_CHANNEL_COUNT_MAX);
+        mic_array[i].location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
+        mic_array[i].group              = 0;
+        mic_array[i].index_in_the_group = 0;
+        mic_array[i].sensitivity    = AUDIO_MICROPHONE_SENSITIVITY_UNKNOWN;
+        mic_array[i].max_spl        = AUDIO_MICROPHONE_SPL_UNKNOWN;
+        mic_array[i].min_spl        = AUDIO_MICROPHONE_SPL_UNKNOWN;
+        mic_array[i].directionality = AUDIO_MICROPHONE_DIRECTIONALITY_UNKNOWN;
+        mic_array[i].num_frequency_responses = 0;
+        /* num_frequency_responses is 0 so no need to set frequency_responses[] */
+        mic_array[i].geometric_location.x = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+        mic_array[i].geometric_location.y = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+        mic_array[i].geometric_location.z = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+        mic_array[i].orientation.x        = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+        mic_array[i].orientation.y        = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+        mic_array[i].orientation.z        = AUDIO_MICROPHONE_COORDINATE_UNKNOWN;
+    }
+
+    pthread_mutex_unlock(&xdev->lock);
+    return 0;
 }
 
 int adev_dump(const struct audio_hw_device *dev, int fd)
