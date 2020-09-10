@@ -357,6 +357,22 @@ int adev_open_output_stream(struct audio_hw_device *dev,
 
     pthread_mutex_lock(&xdev->lock);
 
+    /* handle case with default device without any config */
+    if ((devices & AUDIO_DEVICE_OUT_DEFAULT) == AUDIO_DEVICE_OUT_DEFAULT) {
+        if (config->format == 0) {
+            config->format = AUDIO_FORMAT_PCM_16_BIT;
+            ALOGW("Format is not specified, set it to %d", config->format);
+        }
+        if (audio_channel_count_from_out_mask(config->channel_mask) == 0) {
+            config->channel_mask = audio_channel_out_mask_from_count(2);
+            ALOGW("Channel mask is not specified, set it to %d", config->channel_mask);
+        }
+        if (config->sample_rate == 0) {
+            config->sample_rate = 44100;
+            ALOGW("Sample rate is not specified, set it to %d", config->sample_rate);
+        }
+    }
+
     /* check input parameters*/
     if (!is_config_supported_out(config)) {
         ALOGE("Failed. Not supported audio configuration. -EINVAL");
@@ -443,6 +459,22 @@ int adev_open_input_stream(struct audio_hw_device *dev,
             "Rate:%d, channel_mask:0x%x, format:0x%x, offload.size:%d, frame_count:%d ",
             config->sample_rate, config->channel_mask, config->format,
             config->offload_info.size, config->frame_count);
+
+    /* handle case with default device without any config */
+    if ((devices & AUDIO_DEVICE_IN_DEFAULT) == AUDIO_DEVICE_IN_DEFAULT) {
+        if (config->format == 0) {
+            config->format = AUDIO_FORMAT_PCM_16_BIT;
+            ALOGW("Format is not specified, set it to %d", config->format);
+        }
+        if (audio_channel_count_from_out_mask(config->channel_mask) == 0) {
+            config->channel_mask = audio_channel_in_mask_from_count(1);
+            ALOGW("Channel mask is not specified, set it to %d", config->channel_mask);
+        }
+        if (config->sample_rate == 0) {
+            config->sample_rate = 44100;
+            ALOGW("Sample rate is not specified, set it to %d", config->sample_rate);
+        }
+    }
 
     /* is requested configuration supported? */
 
